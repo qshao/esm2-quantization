@@ -6,20 +6,20 @@ Upload **`arxiv-submission.tar.gz`**, not the PDF. arXiv runs its own `pdflatex`
 on the source; a PDF-only submission is accepted but flagged as lower quality and
 cannot be re-rendered.
 
-## One thing left to fill in
+## Nothing left to fill in
 
-Marked in red in the compiled PDF so it is impossible to miss.
+The Data and Code Availability section now cites
+<https://github.com/qshao/esm2-quantization>. No red placeholders remain.
 
-**Data and code availability** (Section 8) — repository URL or archive DOI.
-The per-variant score files are ~90 MB compressed, which is too large for
-arXiv's ancillary-file allowance, so they need a Zenodo/figshare DOI or a
-public repo. Everything else (code, per-assay CSVs) fits in a normal repo.
-
-Two smaller items, neither blocking:
+Two optional items, neither blocking:
 
 - **No email in the author block.** Common on arXiv and perfectly valid. Add one
   to `\author{...}` if you want a contact address in the PDF itself; the
   submission form collects one regardless.
+- **A Zenodo DOI** would make the ~90 MB of per-variant predictions citable.
+  The repo alone is enough for the paper's claims, since every table is derived
+  from the per-assay CSVs that are committed.
+
 The author block must match what you type into the arXiv submission form; a
 mismatch stalls the submission in moderation.
 
