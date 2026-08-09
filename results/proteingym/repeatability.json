@@ -1,0 +1,90 @@
+[
+  {
+    "model": "3B",
+    "config": "bf16",
+    "n_assays": 201,
+    "n_variants": 2413913,
+    "frac_identical": 1.0,
+    "max_abs_dscore": 0.0,
+    "max_abs_drho": 0.0,
+    "worst_assay": "A0A192B1T2_9HIV1_Haddox_2018",
+    "d_mean_rho": 0.0
+  },
+  {
+    "model": "3B",
+    "config": "int8_dyn",
+    "n_assays": 201,
+    "n_variants": 2413913,
+    "frac_identical": 1.0,
+    "max_abs_dscore": 0.0,
+    "max_abs_drho": 0.0,
+    "worst_assay": "A0A192B1T2_9HIV1_Haddox_2018",
+    "d_mean_rho": 0.0
+  },
+  {
+    "model": "650M",
+    "config": "bf16",
+    "n_assays": 201,
+    "n_variants": 2413913,
+    "frac_identical": 1.0,
+    "max_abs_dscore": 0.0,
+    "max_abs_drho": 0.0,
+    "worst_assay": "A0A192B1T2_9HIV1_Haddox_2018",
+    "d_mean_rho": 0.0
+  },
+  {
+    "model": "650M",
+    "config": "fp32",
+    "n_assays": 201,
+    "n_variants": 2413913,
+    "frac_identical": 1.0,
+    "max_abs_dscore": 0.0,
+    "max_abs_drho": 0.0,
+    "worst_assay": "A0A192B1T2_9HIV1_Haddox_2018",
+    "d_mean_rho": 0.0
+  },
+  {
+    "model": "650M",
+    "config": "fp8_dyn",
+    "n_assays": 201,
+    "n_variants": 2413913,
+    "frac_identical": 1.0,
+    "max_abs_dscore": 0.0,
+    "max_abs_drho": 0.0,
+    "worst_assay": "A0A192B1T2_9HIV1_Haddox_2018",
+    "d_mean_rho": 0.0
+  },
+  {
+    "model": "650M",
+    "config": "int4_wo",
+    "n_assays": 201,
+    "n_variants": 2413913,
+    "frac_identical": 1.0,
+    "max_abs_dscore": 0.0,
+    "max_abs_drho": 0.0,
+    "worst_assay": "A0A192B1T2_9HIV1_Haddox_2018",
+    "d_mean_rho": 0.0
+  },
+  {
+    "model": "650M",
+    "config": "int8_dyn",
+    "n_assays": 201,
+    "n_variants": 2413913,
+    "frac_identical": 1.0,
+    "max_abs_dscore": 0.0,
+    "max_abs_drho": 0.0,
+    "worst_assay": "A0A192B1T2_9HIV1_Haddox_2018",
+    "d_mean_rho": 0.0
+  },
+  {
+    "model": "650M",
+    "config": "int8_wo",
+    "n_assays": 201,
+    "n_variants": 2413913,
+    "frac_identical": 1.0,
+    "max_abs_dscore": 0.0,
+    "max_abs_drho": 0.0,
+    "worst_assay": "A0A192B1T2_9HIV1_Haddox_2018",
+    "d_mean_rho": 0.0
+  }
+]

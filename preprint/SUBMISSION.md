@@ -1,6 +1,6 @@
 # arXiv submission checklist
 
-Build: `./build.sh` → `esm2_quantization.pdf` (28 pp) and `arxiv-submission.tar.gz` (269 KB).
+Build: `./build.sh` → `esm2_quantization.pdf` (29 pp) and `arxiv-submission.tar.gz` (270 KB).
 
 Upload **`arxiv-submission.tar.gz`**, not the PDF. arXiv runs its own `pdflatex`
 on the source; a PDF-only submission is accepted but flagged as lower quality and
@@ -31,7 +31,7 @@ mismatch stalls the submission in moderation.
 ## Verified
 
 - Compiles standalone from the tarball alone — extracted to a clean directory
-  and built with no access to this repo: 28 pages, **no undefined references or
+  and built with no access to this repo: 29 pages, **no undefined references or
   citations**.
 - Fonts fully embedded: Type1 (LaTeX) + TrueType (figures), **no Type3**.
   Figures are generated with `pdf.fonttype 42` for exactly this reason.

@@ -261,6 +261,40 @@ and the percentile method is not distorting the interval. The procedure was
 validated on synthetic data with a known answer: a negligible perturbation was
 correctly classified as noise, a genuine improvement as real.
 
+\subsection{Measurement repeatability}
+\label{sec:repeat}
+
+Every difference reported here is at $10^{-4}$ resolution or finer, and the tail
+statistic is a \emph{maximum} over 201 assays --- a quantity any noise inflates,
+since the maximum of many noisy draws is large even when every true effect is
+zero. Neither is interpretable without knowing what the pipeline does when
+nothing changes, so we measured it rather than assuming determinism.
+
+The complete benchmark was re-run for all six configurations at 650M and for
+\cfg{bf16} and \cfg{int8\_dyn} at 3B, as separate jobs on different physical
+GPUs. Across 8 model/configuration replicates and $19{,}311{,}304$ per-variant score
+comparisons, \textbf{every score is identical} at the $10^{-6}$ precision to
+which scores are stored. Per-assay Spearman is unchanged to five decimals,
+benchmark means to six, and the largest per-assay $|\Delta\rho|$ between two
+runs of the same configuration is $0.00000$.
+
+So the null for the tail statistic is exactly zero --- there is no run-to-run
+variability for a maximum to select from, and a worst-assay $\Delta\rho$ of
+$-0.369$ is entirely attributable to the configuration. Differences of $0.0002$
+are properties of the configuration rather than of the run. And the headline
+collapse reproduces exactly: \texttt{UBR5\_HUMAN\_Tsuboyama\_2023\_1I2T} gives
+$\rho = 0.2226$ under \cfg{int8\_dyn} at 3B in both runs.
+
+Caveats. Determinism removes run-to-run variance and nothing else; the
+assay-sampling uncertainty the bootstrap quantifies is untouched, and a
+reproducible $0.0002$ is still negligible. Both runs used H200 GPUs and one
+software stack, so determinism across GPU architectures or torch/torchao
+versions is not established. Scores are stored rounded to six decimals, so
+``identical'' means identical to $10^{-6}$ --- three orders below the smallest
+effect discussed.
+
+Reproduce with \texttt{python src/analyze\_repeat.py}.
+
 \subsection{Hardware and software environment}
 
 \begin{table}[htb]

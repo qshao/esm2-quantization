@@ -454,6 +454,49 @@ assay-level bootstrap; we report both.}
 \end{algorithmic}
 \end{algorithm}
 
+\subsection{Measurement repeatability}
+\label{sec:repeat}
+
+Every difference we report is at $10^{-4}$ resolution or finer, and the tail
+statistic in Section~\ref{sec:tail} is a \emph{maximum} over 201 assays --- a
+quantity that any noise inflates, since the maximum of many noisy draws is large
+even when every true effect is zero. Neither number is interpretable without
+knowing what the pipeline does when nothing changes, so we measured it rather
+than assuming determinism.
+
+The complete benchmark was re-run for all six configurations at 650M, and for
+\cfg{bf16} and \cfg{int8\_dyn} at 3B, as separate jobs on different physical
+GPUs. Across 8 model/configuration replicates and $19{,}311{,}304$ per-variant score
+comparisons, \textbf{every score is identical} at the $10^{-6}$ precision to
+which scores are stored. Per-assay Spearman is unchanged to five decimals and
+benchmark means to six; the largest per-assay $|\Delta\rho|$ between two runs of
+the same configuration is $0.00000$.
+
+Three consequences follow.
+
+\begin{itemize}\setlength{\itemsep}{2pt}
+  \item \textbf{The null for the tail statistic is exactly zero.} The
+        maximum-over-201 objection does not apply here: there is no run-to-run
+        variability for the maximum to select from, so a worst-assay
+        $\Delta\rho$ of $-0.369$ is entirely attributable to the configuration.
+  \item \textbf{Differences of $+0.0002$ are real differences.} They are
+        properties of the configuration rather than of the run, which is what
+        licenses reporting them at all.
+  \item \textbf{The headline collapse reproduces exactly.}
+        \texttt{UBR5\_HUMAN\_Tsuboyama\_2023\_1I2T} gives $\rho = 0.2226$ under
+        \cfg{int8\_dyn} at 3B in both runs.
+\end{itemize}
+
+Three caveats. Determinism removes run-to-run variance and nothing else: the
+assay-sampling uncertainty that the bootstrap quantifies is untouched, and a
+difference being exactly reproducible does not make it large or important --- a
+reproducible $0.0002$ is still negligible. Both runs used H200 GPUs and one
+software stack, so determinism across GPU architectures or across
+torch/torchao versions is not established and should not be assumed. And scores
+are stored rounded to six decimal places, so ``identical'' means identical to
+$10^{-6}$, which is three orders of magnitude below the smallest effect
+discussed anywhere in this paper.
+
 \subsection{Hardware and software environment}
 
 \begin{table}[htb]
@@ -1603,8 +1646,12 @@ three would have saved a further thirteen and left a third.
         attention term dominates peak memory and quantization's share of the
         memory benefit shrinks correspondingly. A representative FASTA from the
         target workload would settle this.
-  \item \textbf{Single random seed} for quantization; no ensemble over
-        calibration variation.
+  \item \textbf{Determinism is established, not assumed, but only within one
+        stack.} Repeating the benchmark reproduces every score bitwise
+        (Section~\ref{sec:repeat}), so no seed or ensemble over run variation is
+        needed. This says nothing about stability across GPU architectures or
+        torch/torchao versions, which we did not test and which a reader
+        porting these numbers should not assume.
   \item \textbf{The QLoRA track is unbuilt.} \cfg{int4\_wo} at 1.61\,GB is the
         natural base, and fine-tuning is the one setting where quantization buys
         capability rather than efficiency --- full 3B fine-tuning requires

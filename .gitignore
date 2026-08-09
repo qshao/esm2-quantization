@@ -39,3 +39,8 @@ env/setup.log
 token
 *.token
 .gh.curlrc
+
+# Replicate run: 87 MB of per-variant scores, identical to results/proteingym
+# by construction (see src/analyze_repeat.py). The comparison summary is
+# tracked; the raw duplicate is not.
+results/proteingym_rep2/*.jsonl.gz
