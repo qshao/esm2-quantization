@@ -17,4 +17,7 @@ pdflatex -interaction=nonstopmode quantization_report.tex >/dev/null
 
 rm -f quantization_report.aux quantization_report.out
 grep -c Overfull quantization_report.log | xargs echo "overfull boxes:"
+# Undefined refs are silent in the PDF -- they render as "??" and are easy to
+# miss in a 17-page document.
+grep -E "Warning.*(undefined|Citation)" quantization_report.log | sort -u || echo "no undefined refs"
 grep "Output written" quantization_report.log
