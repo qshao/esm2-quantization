@@ -192,6 +192,48 @@ That is acceptable for three hand-picked assays and unsafe at benchmark scale;
 the \texttt{v1} parquet carries \texttt{target\_seq} inline, so scores and
 wild-type sequences come from a single release.
 
+\subsection{Comparability to published benchmark numbers}
+\label{sec:comparability}
+
+Two choices make our absolute correlations not directly comparable to a
+published ESM-2 ProteinGym figure.
+
+\textbf{The aggregation convention matters more than any effect we measure.}
+An unweighted mean over assays, a mean of per-protein means, and a mean of
+per-category means are all defensible and give different answers spanning
+$0.019$ --- roughly three times the largest quantization effect here.
+
+\begin{table}[htb]
+\centering
+\caption{fp32 mean Spearman under four aggregation conventions. The flat mean we
+report is the most favourable of the four. The \emph{differences between
+configurations} are stable across all four: signs identical, magnitudes within
+$\sim$$0.001$, the sole exception being \cfg{int8\_dyn} under category weighting,
+which was not significant under any convention.}
+\label{tab:agg}
+\small
+\begin{tabular}{lrrr}
+\toprule
+Aggregation & ESM2-650M & ESM2-3B & ESM2-15B \\
+\midrule
+Flat mean over 201 assays (this report) & 0.4459 & 0.4398 & 0.4323 \\
+Mean of per-protein means               & 0.4403 & 0.4377 & 0.4321 \\
+Mean of per-category means              & 0.4297 & 0.4209 & 0.4152 \\
+Post-stratified to the full 217         & 0.4406 & 0.4355 & 0.4290 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{The 16 excluded assays are not a random sample.} They exceed ESM-2's
+context ($L = 1154$--$3423$) and are 2.1\% of benchmark variants, but 50\% are
+low-MSA-depth against 13.9\% retained, and none are stability assays against
+32.8\% retained. Low-MSA-depth assays score far worse, so the exclusion inflates
+any unweighted mean --- post-stratifying to the full-217 composition costs about
+$0.004$ at 3B. It also \emph{understates} \cfg{int4\_wo}'s harm at 650M, which
+moves from $-0.0064$ to $-0.0068$ under post-stratification.
+
+Run \texttt{python src/analyze\_scales.py} to reproduce all four conventions.
+
 \subsection{Statistical treatment}
 
 Ground-truth correlations are compared using a \textbf{paired bootstrap} (2000

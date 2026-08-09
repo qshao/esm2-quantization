@@ -320,6 +320,80 @@ That is acceptable for three hand-picked assays and unsafe at benchmark scale;
 the \texttt{v1} parquet carries \texttt{target\_seq} inline, so scores and
 wild-type sequences come from a single release.
 
+\subsection{Comparability to published benchmark numbers}
+\label{sec:comparability}
+
+Two choices make our absolute correlations not directly comparable to a
+published ESM-2 ProteinGym figure, and we state both rather than leave a reader
+to discover them.
+
+\paragraph{The aggregation convention matters more than any effect we measure.}
+There is no single ``the'' ProteinGym average: an unweighted mean over assays,
+a mean of per-protein means, and a mean of per-function-category means are all
+defensible and all give different numbers. On our data they span $0.019$ ---
+roughly three times the largest quantization effect in the paper
+(Table~\ref{tab:agg}).
+
+\begin{table}[htb]
+\centering
+\caption{fp32 mean Spearman under four aggregation conventions. The flat mean we
+report is the most favourable of the four; a within-category mean is $0.019$
+lower at 3B. A reader comparing our numbers against a reference value must match
+the convention first. Crucially, the \emph{differences between configurations}
+--- everything this paper concludes from --- are stable across all four
+(Table~\ref{tab:agg2}).}
+\label{tab:agg}
+\small
+\begin{tabular}{lrrr}
+\toprule
+Aggregation & ESM2-650M & ESM2-3B & ESM2-15B \\
+\midrule
+Flat mean over 201 assays (this paper) & 0.4459 & 0.4398 & 0.4323 \\
+Mean of per-protein means              & 0.4403 & 0.4377 & 0.4321 \\
+Mean of per-category means             & 0.4297 & 0.4209 & 0.4152 \\
+Post-stratified to the full 217        & 0.4406 & 0.4355 & 0.4290 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htb]
+\centering
+\caption{Change relative to fp32 at 3B under each convention. Signs are
+identical throughout and magnitudes agree to $\sim$$0.001$; the sole exception
+is \cfg{int8\_dyn} under category weighting, which was not significant under any
+convention. The conclusions are therefore properties of the data rather than of
+the aggregation choice.}
+\label{tab:agg2}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Config & Flat & Per-protein & Per-category & Post-stratified \\
+\midrule
+\cfg{bf16}      & $+0.0002$ & $+0.0002$ & $+0.0002$ & $+0.0002$ \\
+\cfg{int8\_wo}  & $+0.0001$ & $+0.0001$ & $+0.0004$ & $+0.0002$ \\
+\cfg{fp8\_dyn}  & $+0.0005$ & $+0.0005$ & $+0.0012$ & $+0.0004$ \\
+\cfg{int8\_dyn} & $-0.0021$ & $-0.0027$ & $-0.0000$ & $-0.0022$ \\
+\cfg{int4\_wo}  & $+0.0037$ & $+0.0032$ & $+0.0029$ & $+0.0034$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{The 16 excluded assays are not a random sample.} They exceed ESM-2's
+context ($L = 1154$ to $3423$) and account for 2.1\% of benchmark variants, but
+their composition is skewed: \textbf{50\% are low-MSA-depth against 13.9\% of
+those retained}, and \emph{none} are stability assays against 32.8\% retained.
+Since low-MSA-depth assays score far worse (Table~\ref{tab:strata}), excluding
+them inflates any unweighted mean. Post-stratifying the retained assays to the
+MSA-depth composition of all 217 gives $0.4406 / 0.4355 / 0.4290$, i.e.\ the
+exclusion is worth roughly $+0.004$ at 3B. That is small against the reporting
+differences above but larger than several of the quantization effects, and it
+runs in the direction that flatters our absolute numbers.
+
+The skew also has a second consequence worth flagging: because \cfg{int4\_wo}
+costs most on low-MSA-depth assays at 650M (Table~\ref{tab:strata}), excluding
+them \emph{understates} its harm. Post-stratification moves that effect from
+$-0.0064$ to $-0.0068$.
+
 \subsection{Statistical treatment}
 
 Ground-truth correlations are compared using a \textbf{paired bootstrap} (2000
@@ -1486,11 +1560,19 @@ three would have saved a further thirteen and left a third.
         \cfg{bf16} drift is $-0.0323$ against $-0.0072$ at 3B
         (Table~\ref{tab:tail3}). We did not isolate the cause; a fp16-versus-bf16
         comparison and a per-layer error analysis would be the next step.
-  \item \textbf{The 16 longest assays are excluded.} Assays beyond 1022
-        residues exceed ESM-2's context and were skipped rather than truncated,
-        since a truncation window is a scoring-protocol change that would
-        confound the comparison. Configuration behaviour above $L = 934$ is
-        therefore unmeasured.
+  \item \textbf{The 16 longest assays are excluded, and not at random.} Assays
+        beyond 1022 residues exceed ESM-2's context and were skipped rather
+        than truncated, since a truncation window is a scoring-protocol change
+        that would confound the comparison. The excluded set is 50\%
+        low-MSA-depth against 13.9\% of those retained and contains no
+        stability assays, so it is a biased sample; post-stratification
+        (Section~\ref{sec:comparability}) puts the resulting inflation at about
+        $+0.004$. Configuration behaviour above $L = 934$ is unmeasured.
+  \item \textbf{Absolute correlations are convention-dependent.} Our flat mean
+        is the most favourable of four defensible aggregations, spanning
+        $0.019$. Comparisons against published ESM-2 numbers must match the
+        convention; the configuration \emph{differences} are stable across all
+        four.
   \item \textbf{Only two results survive multiple-comparison correction.}
         Fifteen comparisons against fp32 are reported (five configurations at
         three scales), against a Bonferroni threshold of $0.0033$. Only

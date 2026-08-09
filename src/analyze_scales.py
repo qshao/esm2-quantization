@@ -209,6 +209,58 @@ def main():
     out["tail"] = tails
     out["n_assays_with_signal"] = n_sig
 
+    # ---------- 4. comparability: aggregation convention and the exclusion ----------
+    print("\n" + "=" * 92)
+    print("4. COMPARABILITY. Absolute values depend on the aggregation convention;")
+    print("   the quantization deltas should not. Both are reported so a reader can")
+    print("   match whichever convention their reference number uses.")
+    allids = sorted({a["id"] for a in json.load(open(os.path.join(
+        ROOT, "data", "proteingym_v1", "index.json")))["assays"]})
+    mm = meta.loc[list(assays)]
+    # Post-stratification reweights the retained assays to the MSA-depth
+    # composition of the full 217. The excluded set is not a random sample --
+    # it is 50% low-depth against 13.9% retained -- and low-depth assays score
+    # far worse, so the exclusion inflates any unweighted mean.
+    tgt = meta.loc[allids, "MSA_Neff_L_category"].value_counts(normalize=True)
+    cur = mm["MSA_Neff_L_category"].value_counts(normalize=True)
+    wts = mm["MSA_Neff_L_category"].map(tgt / cur).to_numpy()
+    AGG = [("flat mean (this paper)", lambda v: float(np.mean(v))),
+           ("within-protein mean",
+            lambda v: float(pd.Series(v, index=mm["UniProt_ID"].values)
+                            .groupby(level=0).mean().mean())),
+           ("within-category mean",
+            lambda v: float(pd.Series(v, index=mm["coarse_selection_type"].values)
+                            .groupby(level=0).mean().mean())),
+           ("post-stratified to 217", lambda v: float(np.average(v, weights=wts)))]
+    print(f"\n   fp32 mean rho:")
+    print(f"   {'aggregation':24s}" + "".join(f"{m:>9s}" for m in SCALES))
+    agg_out = {}
+    for name, f in AGG:
+        vals = {m: f(wide[m][REF].values) for m in SCALES}
+        agg_out[name] = {"fp32": vals, "delta": {}}
+        print(f"   {name:24s}" + "".join(f"{vals[m]:9.4f}" for m in SCALES))
+    print(f"\n   deltas vs fp32 (3B) -- sign and magnitude under each convention:")
+    print(f"   {'config':10s}" + "".join(f"{n[:19]:>21s}" for n, _ in AGG))
+    for c in CFGS:
+        line = f"   {c:10s}"
+        for name, f in AGG:
+            for m in SCALES:
+                agg_out[name]["delta"].setdefault(m, {})[c] = (
+                    f(wide[m][c].values) - f(wide[m][REF].values))
+            line += f"{agg_out[name]['delta']['3B'][c]:+21.4f}"
+        print(line)
+    out["aggregation"] = agg_out
+    e = meta.loc[[a for a in allids if a not in set(assays)]]
+    out["excluded"] = {"n": len(e), "seq_len_range": [int(e.seq_len.min()), int(e.seq_len.max())],
+                       "frac_variants": float(e.DMS_total_number_mutants.sum()
+                                              / meta.loc[allids].DMS_total_number_mutants.sum()),
+                       "msa_low_frac": float((e.MSA_Neff_L_category == "Low").mean()),
+                       "stability_frac": float((e.coarse_selection_type == "Stability").mean())}
+    print(f"\n   16 excluded assays: L {out['excluded']['seq_len_range']}, "
+          f"{out['excluded']['frac_variants']:.1%} of variants, "
+          f"{out['excluded']['msa_low_frac']:.0%} low-MSA-depth (retained: 14%), "
+          f"0% Stability (retained: 33%)")
+
     with open(os.path.join(ROOT, args.out), "w") as fh:
         json.dump(out, fh, indent=2)
     print(f"\n[done] {args.out}")
