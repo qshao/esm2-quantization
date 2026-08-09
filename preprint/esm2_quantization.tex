@@ -8,6 +8,8 @@
 \usepackage{microtype}
 \usepackage{caption}
 \usepackage{array}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage[hidelinks]{hyperref}
 
@@ -167,8 +169,11 @@ that the proxy is a valid risk bound but an invalid quality ranking.
 Six configurations were evaluated, all applied via \texttt{torchao} to the
 encoder \texttt{Linear} layers only:
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Quantization configurations. Weight-only variants target memory; the
+dynamic (W8A8) variants also quantize activations and can therefore use
+low-precision tensor cores for the matrix multiply itself.}
 \small
 \begin{tabular}{llp{7.4cm}}
 \toprule
@@ -184,9 +189,6 @@ Configuration & Class & Description \\
                                compute capability $\geq 8.9$; H200 only. \\
 \bottomrule
 \end{tabular}
-\caption{Quantization configurations. Weight-only variants target memory; the
-dynamic (W8A8) variants also quantize activations and can therefore use
-low-precision tensor cores for the matrix multiply itself.}
 \end{table}
 
 \subsection{Workloads}
@@ -200,10 +202,51 @@ $\log p(\text{mut}) - \log p(\text{wt})$ from the resulting distribution. Cost
 scales with the \emph{number of mutated positions}, not with the number of
 variants, and the masked batch is narrow. This is the latency-bound regime.
 
-Two optimizations were applied to the DMS path before benchmarking, both of
-which are absent from typical reference implementations: only positions
-carrying a variant are masked, and the masked copies are batched rather than
-run one at a time.
+Algorithm~\ref{alg:mm} states the scoring procedure as implemented. Two
+optimizations, both absent from typical reference implementations, are marked:
+only positions carrying a variant are masked (line~\ref{ln:pos}), and the masked
+copies are batched rather than run one at a time (line~\ref{ln:batch}). Together
+they are worth one to two orders of magnitude on a real assay --- the median
+ProteinGym assay mutates 96 positions out of $L=222$ --- and they are applied
+identically to every configuration, so they change the absolute cost of the
+benchmark without affecting any comparison within it.
+
+\begin{algorithm}[htb]
+\caption{Masked-marginals variant scoring, as benchmarked. Cost is
+$\lceil |P| / B \rceil$ forward passes and is independent of $|V|$, so an assay
+with 16{,}000 variants over 900 positions costs the same as one with 900.}
+\label{alg:mm}
+\begin{algorithmic}[1]
+\Require wild-type sequence $s$, variants $V$, model $f_\theta$, batch size $B$
+\Ensure score $\sigma(v)$ for every $v \in V$
+\State $M \gets \{\,\text{parse}(v) : v \in V\,\}$
+       \Comment{each $v$ is a set of $(\text{wt}, \text{pos}, \text{mut})$ triples}
+\For{each $(a, i, b) \in \bigcup M$}
+  \State \textbf{assert} $s_i = a$
+         \Comment{indexing check; a mismatch is silent and unrecoverable later}
+\EndFor
+\State $P \gets \{\, i : (a,i,b) \in \bigcup M \,\}$ \label{ln:pos}
+       \Comment{\textbf{only} variant-carrying positions, not all $L$}
+\For{each chunk $C \subseteq P$ with $|C| = B$} \label{ln:batch}
+  \State $X \gets$ $|C|$ copies of tokenize($s$); set $X_{r,\,c_r} \gets \texttt{[MASK]}$
+         \Comment{one masked position per row}
+  \State $Z \gets f_\theta(X)$ \Comment{single batched forward pass}
+  \For{each $r$, with $c_r \in C$}
+    \State $\ell_{c_r} \gets \log\mathrm{softmax}\!\left(Z_{r,\,c_r} \text{ in fp32}\right)$
+           \Comment{fp32 softmax regardless of compute precision}
+  \EndFor
+\EndFor
+\For{each $v \in V$}
+  \State $\sigma(v) \gets \sum_{(a,i,b) \in M_v} \big(\ell_i[b] - \ell_i[a]\big)$
+         \Comment{difference of near-equal terms: noise does not cancel}
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+The final line is why DMS $\rho$ is the most sensitive fidelity metric we record.
+The score is a difference of two nearly equal log-probabilities, so quantization
+error in $\ell_i$ does not cancel between the two terms; it is amplified relative
+to the signal.
 
 \subsection{Metrics}
 
@@ -228,8 +271,13 @@ the latter, we added a fourth metric requiring real experimental data:
 Three ProteinGym substitution assays were selected to span the sequence-length
 range, since peak memory during masked-marginals scoring grows with $L$:
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{ProteinGym assays used. All 19{,}557 single-substitution variants had
+their stated wild-type residue verified against the reference \texttt{target\_seq}
+before use; all matched. This check is load-bearing --- an off-by-one in
+position indexing does not raise an error, it silently scores the wrong
+positions and yields a plausible-looking correlation.}
 \small
 \begin{tabular}{lrrrl}
 \toprule
@@ -240,11 +288,6 @@ Assay & $L$ & Singles & Masked positions & Coverage \\
 \texttt{HSP82\_YEAST\_Flynn\_2019}    & 709 & 13{,}194 & 707 & 100\% \\
 \bottomrule
 \end{tabular}
-\caption{ProteinGym assays used. All 19{,}557 single-substitution variants had
-their stated wild-type residue verified against the reference \texttt{target\_seq}
-before use; all matched. This check is load-bearing --- an off-by-one in
-position indexing does not raise an error, it silently scores the wrong
-positions and yields a plausible-looking correlation.}
 \end{table}
 
 \subsection{Full benchmark data}
@@ -287,17 +330,51 @@ correlated replicates cannot count as independent evidence. Clustered and
 unclustered intervals agreed to the fourth decimal, which is reported as a
 measured result rather than assumed.
 
-Intervals are percentile bootstrap. They were checked against a normal
-approximation ($\bar{d} \pm 1.96\,\mathrm{SE}$) and agree to four decimals on
-every configuration, confirming the underlying distribution is near-symmetric
+Intervals are percentile bootstrap~\cite{efron1993}. They were checked against a
+normal approximation ($\bar{d} \pm 1.96\,\mathrm{SE}$) and agree to four decimals
+on every configuration, confirming the underlying distribution is near-symmetric
 and the percentile method is not distorting the interval. The procedure was
 validated on synthetic data with a known answer: a negligible perturbation was
 correctly classified as noise, a genuine improvement as real.
 
+Algorithm~\ref{alg:boot} states the benchmark-level test. The pairing is
+line~\ref{ln:pair}: one resample index is applied to the candidate and to the
+reference \emph{together}. Without it the interval widens by $8.4\times$ for
+\cfg{int4\_wo}, because between-assay variance in $\rho$ (spanning $0.0$ to
+$0.9$) is two orders of magnitude larger than the configuration effect
+($\approx 0.006$), and every configuration is then reported as noise.
+
+\begin{algorithm}[htb]
+\caption{Paired cluster bootstrap for $\Delta$(mean $\rho$) against the fp32
+reference. Setting $\mathcal{G}$ to singletons recovers the ordinary
+assay-level bootstrap; we report both.}
+\label{alg:boot}
+\begin{algorithmic}[1]
+\Require per-assay correlations $\rho^{c}_{a}, \rho^{\text{ref}}_{a}$ for assays
+         $a = 1{:}n$; protein clusters $\mathcal{G}$ partitioning the assays;
+         $R = 2000$
+\Ensure point estimate $\Delta$, 95\% interval, two-sided $p$
+\State $\Delta \gets \frac{1}{n}\sum_a \rho^{c}_{a} - \frac{1}{n}\sum_a \rho^{\text{ref}}_{a}$
+\For{$r = 1$ \textbf{to} $R$}
+  \State draw $|\mathcal{G}|$ clusters from $\mathcal{G}$ with replacement
+  \State $S_r \gets$ concatenation of all assays in the drawn clusters
+         \Comment{$|S_r|$ varies between replicates}
+  \State $d_r \gets \frac{1}{|S_r|}\sum_{a \in S_r}\!\big(\rho^{c}_{a} - \rho^{\text{ref}}_{a}\big)$
+         \label{ln:pair}
+         \Comment{\textbf{same} $S_r$ indexes both arms}
+\EndFor
+\State $[\,\ell, u\,] \gets$ 2.5th and 97.5th percentiles of $\{d_r\}$
+\State $p \gets 2\min\!\big(\tfrac{1}{R}|\{d_r \le 0\}|,\; \tfrac{1}{R}|\{d_r \ge 0\}|\big)$
+       \Comment{floor $2/R = 0.001$; report smaller values as $p < 0.002$}
+\State \Return $\Delta$, $[\ell, u]$, $p$; call the effect real iff $0 \notin [\ell, u]$
+\end{algorithmic}
+\end{algorithm}
+
 \subsection{Hardware and software environment}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Hardware and software environment. The glibc 2.17 ceiling is what forces torch 2.6.0 and rules out the prebuilt bitsandbytes GPU wheels, so NF4 was unavailable and is absent from the configuration list.}
 \small
 \begin{tabular}{ll}
 \toprule
@@ -335,8 +412,10 @@ scheme but the \texttt{torch.compile} mode. Measured on a single ESM2-3B-shaped
 feed-forward block, $2560 \to 10240 \to 2560$, at batch $32 \times 512$ on an
 A100:
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Only \texttt{max-autotune} allows Inductor to autotune the INT8 Triton
+matmuls, which is where the entire W8A8 benefit resides.}
 \small
 \begin{tabular}{lr}
 \toprule
@@ -350,8 +429,6 @@ bf16 compiled                                & 7.91 \\
 \cfg{int8\_dyn} \texttt{mode="max-autotune"} & \best{5.43} \\
 \bottomrule
 \end{tabular}
-\caption{Only \texttt{max-autotune} allows Inductor to autotune the INT8 Triton
-matmuls, which is where the entire W8A8 benefit resides.}
 \end{table}
 
 Measured in eager mode, W8A8 appears $4.2\times$ \emph{slower} than bf16 and
@@ -364,8 +441,12 @@ kernel-selection effect rather than a Dynamo fallback.
 
 \subsection{Bulk embedding extraction}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{ESM2-3B, H200, compiled with \texttt{max-autotune-no-cudagraphs}, SDPA
+attention, 64 sequences of length 512--1024 under a 16{,}384-token budget.
+Reproduced across four independent jobs: bf16 mean 56{,}642 residues/s, range
+55{,}941--57{,}422 ($\pm 1.3\%$); fp32 mean 6{,}742, range 6{,}687--6{,}814.}
 \small
 \begin{tabular}{lrrrrrrr}
 \toprule
@@ -380,10 +461,6 @@ Config & Weights & Peak & Residues/s & vs bf16 & Emb.\ cos & Logit KL & DMS $\rh
 \cfg{int4\_wo}    & \best{1.61} &  7.69 &  3{,}813 & 0.07$\times$ & 0.998904 & 1.89e--03 & 0.9975 \\
 \bottomrule
 \end{tabular}
-\caption{ESM2-3B, H200, compiled with \texttt{max-autotune-no-cudagraphs}, SDPA
-attention, 64 sequences of length 512--1024 under a 16{,}384-token budget.
-Reproduced across four independent jobs: bf16 mean 56{,}642 residues/s, range
-55{,}941--57{,}422 ($\pm 1.3\%$); fp32 mean 6{,}742, range 6{,}687--6{,}814.}
 \end{table}
 
 Three observations. First, the \textbf{fp32 $\to$ bf16 step is worth
@@ -405,8 +482,10 @@ a larger effect than several of the quantization differences in the table.
 
 \subsection{DMS scoring: the opposite conclusion}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{DMS scoring throughput, ESM2-3B, uncompiled. bf16 wins at every problem
+size; quantization is pure overhead in this regime.}
 \small
 \begin{tabular}{lrrr}
 \toprule
@@ -422,8 +501,6 @@ Config & \multicolumn{3}{c}{Variants/s} \\
 \cfg{int4\_wo}  & 1{,}045 &   282 &   112 \\
 \bottomrule
 \end{tabular}
-\caption{DMS scoring throughput, ESM2-3B, uncompiled. bf16 wins at every problem
-size; quantization is pure overhead in this regime.}
 \end{table}
 
 bf16 is fastest at every assay size, and \cfg{int8\_dyn} --- the second-fastest
@@ -440,8 +517,11 @@ that is indefensible at $L=72$.
 
 \subsection{Memory during DMS scoring}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Peak device memory during DMS scoring. Weights account for
+approximately 90\% of peak even at $L=709$ (bf16: 5.29\,GB weights against
+0.59\,GB activations).}
 \small
 \begin{tabular}{lrrrr}
 \toprule
@@ -455,9 +535,6 @@ Config & Weights (GB) & Peak $L{=}72$ & Peak $L{=}286$ & Peak $L{=}709$ \\
 \cfg{int4\_wo}  & \best{1.61} & \best{1.70} & \best{1.87} & \best{2.20} \\
 \bottomrule
 \end{tabular}
-\caption{Peak device memory during DMS scoring. Weights account for
-approximately 90\% of peak even at $L=709$ (bf16: 5.29\,GB weights against
-0.59\,GB activations).}
 \end{table}
 
 This is the reverse of the bulk-extraction situation. Masked-marginals scoring
@@ -469,8 +546,11 @@ smallest footprint at every length --- $2.7\times$ below bf16.
 \subsection{Ground-truth accuracy on ProteinGym}
 \label{sec:gt}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Spearman correlation against experimental measurements, ESM2-3B.
+$\Delta$ is the change from fp32, with a 2000-sample paired bootstrap over
+variants. ``Real'' indicates the 95\% confidence interval excludes zero.}
 \small
 \begin{tabular}{llrrrl}
 \toprule
@@ -498,9 +578,6 @@ HSP82      & \cfg{fp32}      & 0.2931 & (ref)    &                      &  \\
            & \cfg{int4\_wo}  & 0.2904 & $-0.0027$ & $[-0.0057, +0.0002]$ & noise \\
 \bottomrule
 \end{tabular}
-\caption{Spearman correlation against experimental measurements, ESM2-3B.
-$\Delta$ is the change from fp32, with a 2000-sample paired bootstrap over
-variants. ``Real'' indicates the 95\% confidence interval excludes zero.}
 \end{table}
 
 Two findings emerge, and the second qualifies the first.
@@ -549,8 +626,9 @@ An incidental observation deserves note, because it bears directly on how much
 any of this matters. The fp32 650M model correlates with experiment
 \emph{better} than the fp32 3B model on two of the three assays:
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Ground-truth correlation by model scale on the three-assay subset. The 0.14 BLAT gap prompted the inference that model choice dominates precision choice; Section~\ref{sec:full} shows it does not generalise.}
 \small
 \begin{tabular}{lrrr}
 \toprule
@@ -594,8 +672,13 @@ evidence. The two intervals turned out to agree to the fourth decimal, so the
 clustering was immaterial here; it is reported because that had to be measured
 rather than assumed.
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Mean Spearman against experiment over 201 assays. Bold marks intervals
+excluding zero under the protein-clustered paired bootstrap. Note that
+\cfg{int4\_wo} is significant in \emph{opposite directions} on the two model
+scales. This is not driven by a handful of outliers: \cfg{int4\_wo} is worse
+than fp32 on 143 of 201 assays at 650M and on only 91 of 201 at 3B.}
 \small
 \begin{tabular}{lrrlrrl}
 \toprule
@@ -611,10 +694,6 @@ fp32              & 0.4398 & ---     & (ref)              & 0.4459 & ---     & (
 \cfg{int4\_wo}    & 0.4435 & $\mathbf{+0.0037}$ & $[+0.0007,+0.0068]$ & 0.4395 & $\mathbf{-0.0064}$ & $[-0.0105,-0.0018]$ \\
 \bottomrule
 \end{tabular}
-\caption{Mean Spearman against experiment over 201 assays. Bold marks intervals
-excluding zero under the protein-clustered paired bootstrap. Note that
-\cfg{int4\_wo} is significant in \emph{opposite directions} on the two model
-scales.}
 \end{table}
 
 \subsubsection*{The benchmark mean is the wrong safety criterion}
@@ -635,8 +714,10 @@ separates them immediately.}
 \label{fig:tail}
 \end{figure}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Worst single-assay change in ground-truth correlation, and count of
+assays moving by more than $0.05$, out of 201.}
 \small
 \begin{tabular}{lrrrr}
 \toprule
@@ -651,8 +732,6 @@ Config & worst $\Delta$ & $|\Delta|>0.05$ & worst $\Delta$ & $|\Delta|>0.05$ \\
 \cfg{int4\_wo}  & $-0.0556$ & 5 & $\mathbf{-0.2024}$ & 6 \\
 \bottomrule
 \end{tabular}
-\caption{Worst single-assay change in ground-truth correlation, and count of
-assays moving by more than $0.05$, out of 201.}
 \end{table}
 
 \cfg{int8\_dyn} at 3B is indistinguishable from fp32 on the benchmark mean
@@ -695,15 +774,59 @@ drift is not evidence of a worse model.}
 \label{fig:fidelity}
 \end{figure}
 
-\textbf{Damage concentrates where the model is weakest.} At 650M, \cfg{int4\_wo}
-costs $0.0174$ on low-MSA-depth assays against $0.0042$ on high-depth ones.
-Quantization does most harm where there is least signal to lose --- a breakdown
-three assays cannot support.
+\textbf{Damage concentrates where the model is weakest.} \cfg{int4\_wo}'s cost is
+monotone in MSA depth at \emph{both} model scales: low $<$ medium $<$ high, with
+$-0.0174$ on low-depth assays against $-0.0042$ on high-depth at 650M.
+Quantization does most harm where there is least evolutionary signal to lose.
+This is the only stratification we find that replicates across scale --- the
+breakdown by function category does not, and neither is a distinction three
+assays can support. Table~\ref{tab:strata} gives both.
+
+\begin{table}[htb]
+\centering
+\caption{Mean $\rho$ against experiment, stratified by ProteinGym function
+category and by MSA depth. \cfg{bf16}, \cfg{int8\_wo} and \cfg{fp8\_dyn} track
+fp32 in every stratum. \cfg{int4\_wo} does not. Its deviations by \emph{function
+category} do not transfer across model scale --- Binding is its worst stratum at
+650M ($-0.018$) and its second-best at 3B ($+0.005$) --- so category-level
+behaviour is no more predictable than the overall sign. Its ordering by
+\emph{MSA depth} does transfer, and is monotone at both scales: low $<$ medium
+$<$ high ($-0.017 < -0.005 < -0.004$ at 650M, $-0.001 < +0.001 < +0.010$ at 3B).
+Quantization costs most where the model has least evolutionary signal to work
+with, and that is the one stratification here that replicates.}
+\label{tab:strata}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Stratum & \cfg{fp32} & \cfg{bf16} & \cfg{int8\_wo} & \cfg{fp8\_dyn} & \cfg{int8\_dyn} & \cfg{int4\_wo} \\
+\midrule
+\multicolumn{7}{l}{\emph{ESM2-3B}} \\
+\quad Activity          & 0.4269 & 0.4271 & 0.4274 & 0.4267 & 0.4270 & 0.4287 \\
+\quad Binding           & 0.3392 & 0.3396 & 0.3400 & 0.3440 & 0.3405 & 0.3441 \\
+\quad Expression        & 0.4288 & 0.4288 & 0.4293 & 0.4294 & 0.4356 & 0.4270 \\
+\quad OrganismalFitness & 0.4006 & 0.4005 & 0.4006 & 0.4005 & 0.3990 & 0.4003 \\
+\quad Stability         & 0.5091 & 0.5095 & 0.5089 & 0.5097 & 0.5023 & 0.5192 \\
+\quad MSA depth: low    & 0.3264 & 0.3265 & 0.3272 & 0.3261 & 0.3239 & 0.3253 \\
+\quad MSA depth: high   & 0.4874 & 0.4876 & 0.4879 & 0.4894 & 0.4888 & 0.4971 \\
+\addlinespace
+\multicolumn{7}{l}{\emph{ESM2-650M}} \\
+\quad Activity          & 0.4332 & 0.4329 & 0.4327 & 0.4315 & 0.4312 & 0.4217 \\
+\quad Binding           & 0.3560 & 0.3571 & 0.3565 & 0.3562 & 0.3542 & 0.3376 \\
+\quad Expression        & 0.4398 & 0.4397 & 0.4398 & 0.4382 & 0.4390 & 0.4398 \\
+\quad OrganismalFitness & 0.3960 & 0.3959 & 0.3959 & 0.3945 & 0.3951 & 0.3844 \\
+\quad Stability         & 0.5233 & 0.5235 & 0.5230 & 0.5239 & 0.5200 & 0.5258 \\
+\quad MSA depth: low    & 0.3180 & 0.3184 & 0.3186 & 0.3181 & 0.3177 & 0.3006 \\
+\quad MSA depth: high   & 0.5176 & 0.5175 & 0.5171 & 0.5175 & 0.5151 & 0.5134 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsubsection*{Speed and memory over the whole benchmark}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Full 201-assay benchmark, ESM2-3B on one H200, uncompiled. Wall-clock
+is summed scoring time over all assays.}
 \small
 \begin{tabular}{lrrrr}
 \toprule
@@ -717,8 +840,6 @@ fp32            & 45.0 min & 25.6  & 11.10 GB & 12.20 GB \\
 \cfg{int4\_wo}  & 73.8 min & 17.3  & \textbf{1.82 GB} & \textbf{2.37 GB} \\
 \bottomrule
 \end{tabular}
-\caption{Full 201-assay benchmark, ESM2-3B on one H200, uncompiled. Wall-clock
-is summed scoring time over all assays.}
 \end{table}
 
 The DMS recommendation from three assays survives and strengthens: \cfg{bf16}
@@ -747,8 +868,9 @@ slowest --- an exact inversion of the bulk-throughput column. Two successive
 fixes failed. Direct instrumentation finally established the cause. On
 650M/A100 with a 40-residue wild type over 11 masked positions:
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Compilation cost inside the timed region. A single forward pass at the DMS input shape costs 15\,s to autotune and 28\,ms to execute, so a timed region containing compilation ranks configurations by their number of Triton kernel candidates rather than by their speed.}
 \small
 \begin{tabular}{lr}
 \toprule
@@ -782,8 +904,9 @@ buckets inside the timed region.
 Peak memory during DMS scoring was reported as follows, with the activation
 overhead implied by subtracting weights:
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{The peak-memory artifact. Each configurations measured peak contains the previous configurations weights, which surfaces as bf16 apparently needing more peak memory than fp32.}
 \small
 \begin{tabular}{lrrr}
 \toprule
@@ -861,6 +984,7 @@ substantially reordered. No single configuration is preferred by both.}
 \end{figure}
 
 \subsection{On the interpretation of fidelity metrics}
+\label{sec:fidelity}
 
 The conventional validation practice --- quantize, measure drift against the
 full-precision model, accept if drift is small --- is sound as a
@@ -902,8 +1026,9 @@ $0.018$ across 402 assay/model pairs), \cfg{fp8\_dyn} is nearly so ($0.034$), an
 
 \subsection{Recommendations}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Configuration recommendations by situation. The first two rows differ because the two workloads sit in different bottleneck regimes, not because of any accuracy difference.}
 \small
 \begin{tabular}{ll}
 \toprule
@@ -935,6 +1060,55 @@ still useful: the \emph{uncertainty} on model choice ($\pm 0.012$) exceeds every
 quantization effect measured here ($\leq 0.007$). Precision is the settled
 variable; checkpoint choice is not, and is worth benchmarking on a
 representative assay.
+
+\subsection{A selection protocol}
+
+Our results imply a procedure rather than a ranking, because the quantity that
+separates configurations --- worst-case single-assay drift --- is cheap to
+measure on a target and cannot be inferred from published means.
+Algorithm~\ref{alg:select} states it. The essential point is line~\ref{ln:screen}:
+the screen runs against the fp32 model on the user's own sequences and needs no
+experimental labels, so it costs one extra scoring pass and no wet-lab work.
+
+\begin{algorithm}[htb]
+\caption{Choosing a precision configuration for a variant-effect workload. The
+screen requires no ground-truth labels, because Section~\ref{sec:fidelity} establishes that
+drift from fp32 is a valid bound on how far the answer can move even though it
+does not indicate direction.}
+\label{alg:select}
+\begin{algorithmic}[1]
+\Require target protein(s) $S$, tolerance $\tau$ on Spearman drift, memory budget $m$
+\State score $S$ under \cfg{bf16}; \textbf{if} it fits in $m$, \textbf{return} \cfg{bf16}
+       \Comment{fastest at every problem size we measured}
+\State $\mathcal{C} \gets \langle \cfg{int8\_wo}, \cfg{fp8\_dyn} \rangle$
+       \Comment{ordered by measured worst-case drift, not by mean}
+\For{$c \in \mathcal{C}$ with weight footprint $\leq m$}
+  \State $\rho_c \gets \mathrm{Spearman}\big(\sigma_c(V_S),\; \sigma_{\text{fp32}}(V_S)\big)$
+         \label{ln:screen}
+         \Comment{one scoring pass; no labels needed}
+  \State \textbf{if} $1 - \rho_c \leq \tau$ \textbf{then return} $c$
+\EndFor
+\State \textbf{if} $m$ still unmet: use \cfg{int4\_wo} \textbf{only} after
+       confirming $1-\rho_c \le \tau$ on \emph{this} target
+       \Comment{worst observed single-assay collapse: $-0.20$}
+\State \textbf{else} reduce $m$ by reducing model scale before reducing precision
+\end{algorithmic}
+\end{algorithm}
+
+We deliberately do not recommend selecting on published benchmark means. On the
+201-assay mean, \cfg{int8\_dyn} and \cfg{bf16} are separated by $0.002$; on
+worst-case single-assay behaviour they are separated by $0.36$. The mean is the
+statistic most likely to be quoted and the least useful for this decision.
+
+\subsection{Computational cost}
+
+The full benchmark costs $3.1$ GPU-hours at 3B and $0.9$ at 650M on a single
+H200 for all six configurations --- $40{,}775$ masked forward passes per
+configuration, six configurations, two scales. This is small enough that
+evaluating on the complete benchmark rather than a subset is a matter of
+choosing to, not of affording to. The three-assay evaluation this study began
+with saved roughly two GPU-hours and produced two conclusions that the full
+benchmark reversed.
 
 \section{Limitations}
 
@@ -975,37 +1149,65 @@ representative assay.
 
 \section{Conclusions}
 
-\begin{enumerate}
-  \item For \textbf{bulk embedding extraction} of ESM2-3B on H200 hardware,
-        \cfg{fp8\_dyn} under \texttt{max-autotune} is the best configuration
-        on all three axes at once: $1.15\times$ bf16 throughput, 43\% less peak
-        memory, and no measurable accuracy cost.
-  \item For \textbf{DMS variant-effect scoring}, quantization is
-        counterproductive. bf16 in eager mode is fastest at every problem size,
-        and compilation is actively harmful. The two workloads want opposite
-        configurations.
-  \item \textbf{Drift from fp32 bounds risk; it does not rank quality.}
-        Over 1005 assay/configuration pairs it predicts the magnitude of
-        real-world accuracy change ($r = 0.81$) and not its sign, which does not
-        even hold between model scales. Configurations whose drift is small
-        enough that the sign cannot matter --- \cfg{bf16} and \cfg{int8\_wo},
-        never beyond $0.018$ Spearman on any of 402 assay/model pairs --- are the
-        defensible choices when accuracy is at stake.
-  \item \textbf{Select on the tail, not the mean.} No configuration moves mean
-        benchmark correlation by more than $0.007$, and that fact is nearly
-        useless for deployment. \cfg{int8\_dyn} passes the mean test at 3B
-        ($p = 0.34$) while taking one assay from $\rho = 0.591$ to $0.223$.
-        Worst-case single-assay drift separates the configurations by two orders
-        of magnitude where the means separate them by none.
-  \item \textbf{Validate on the workload you actually run, at the scale you
-        intend to generalise to.} A synthetic mutational scan produced a
-        confident and incorrect ranking of configurations. Three real assays
-        corrected it and produced a second incorrect generalisation --- that
-        quantization does not systematically degrade accuracy, and that
-        checkpoint choice dominates precision choice. Both fell to 201 assays.
-        Each step was a genuine improvement in evidence and each intermediate
-        conclusion was wrong in a way that looked well-supported at the time.
+\paragraph{What to run.} Two workloads, two different answers, and no
+compromise configuration.
+
+\begin{itemize}\setlength{\itemsep}{2pt}
+  \item \textbf{Bulk embedding extraction: \cfg{fp8\_dyn} with
+        \texttt{max-autotune}.} Best on all three axes simultaneously ---
+        $1.15\times$ bf16 throughput, peak memory $12.63 \to 7.24$\,GB, accuracy
+        indistinguishable from bf16. This requires FP8 hardware (sm\_90); on
+        A100, \cfg{int8\_wo}.
+  \item \textbf{Variant-effect scoring: \cfg{bf16}, eager, uncompiled.} Fastest
+        at every problem size from $L=37$ to $934$, and $6.2\times$ faster than
+        fp32 over the full benchmark. Quantization here is pure overhead and
+        compilation is actively harmful. Use \cfg{int8\_wo} if memory forces it
+        ($2.87$ vs $5.50$\,GB, 69\% of bf16 speed).
+  \item \textbf{Avoid \cfg{int8\_dyn} and \cfg{int4\_wo} for variant-effect
+        work.} They are not trade-offs: both are \emph{slower} than bf16 in this
+        regime and carry single-assay collapses of $-0.37$ and $-0.20$.
+\end{itemize}
+
+\paragraph{What the evidence says about evidence.} Three findings generalise
+past ESM-2, and each contradicts a common practice.
+
+\begin{enumerate}\setlength{\itemsep}{3pt}
+  \item \textbf{Select on worst-case drift, not on benchmark means.} Across 201
+        assays no configuration moves mean correlation by more than $0.007$ ---
+        the statistic most likely to be published, and the one least able to
+        distinguish these configurations. \cfg{int8\_dyn} passes the mean test at
+        3B ($p = 0.34$) and takes one assay from $\rho = 0.591$ to $0.223$. On
+        means, \cfg{int8\_dyn} and \cfg{bf16} differ by $0.002$; on worst case,
+        by $0.36$ --- a factor of $180$.
+  \item \textbf{Drift from fp32 is a valid safety certificate and an invalid
+        quality ranking.} Over 1005 assay/configuration pairs it predicts the
+        \emph{magnitude} of ground-truth change ($r = 0.81$) but not its
+        \emph{direction}, whose correlation reverses sign between model scales
+        ($-0.58$ at 3B, $+0.10$ at 650M). So a configuration close to fp32 is
+        safe, while a configuration far from fp32 is merely unpredictable ---
+        not worse. \cfg{bf16} and \cfg{int8\_wo} never exceed $0.018$ Spearman on
+        any of 402 assay/model pairs and are safe on that basis alone; this is
+        cheap to verify on a target and needs no experimental labels
+        (Algorithm~\ref{alg:select}).
+  \item \textbf{Evidence scale is not a matter of rigour but of conclusions.}
+        This study reached three successive verdicts. A synthetic mutational
+        scan ranked configurations confidently and wrongly. Three real
+        ProteinGym assays overturned it and produced two further
+        generalisations --- that quantization does not systematically degrade
+        accuracy, and that checkpoint choice dominates precision choice --- both
+        of which the full 201-assay benchmark reversed. Every intermediate
+        conclusion was statistically sound on its own data and looked
+        well-supported. The full benchmark costs $3.1$ GPU-hours; the
+        three-assay version saved two and cost two wrong conclusions.
 \end{enumerate}
+
+\paragraph{The general claim.} A benchmark mean answers whether a configuration
+is safe \emph{on average over targets}. Deployment asks whether it is safe on
+\emph{one} target. These questions have different answers here, and the gap
+between them is not a detail --- it is the difference between $0.002$ and
+$0.36$. Wherever a benchmark aggregates over heterogeneous instances and the
+user faces one instance, we expect the same gap, and we would report the tail
+alongside the mean as a matter of course.
 
 \section{Data and Code Availability}
 \label{sec:avail}

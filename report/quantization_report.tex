@@ -91,8 +91,11 @@ This report addresses three questions:
 Six configurations were evaluated, all applied via \texttt{torchao} to the
 encoder \texttt{Linear} layers only:
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Quantization configurations. Weight-only variants target memory; the
+dynamic (W8A8) variants also quantize activations and can therefore use
+low-precision tensor cores for the matrix multiply itself.}
 \small
 \begin{tabular}{llp{7.4cm}}
 \toprule
@@ -108,9 +111,6 @@ Configuration & Class & Description \\
                                compute capability $\geq 8.9$; H200 only. \\
 \bottomrule
 \end{tabular}
-\caption{Quantization configurations. Weight-only variants target memory; the
-dynamic (W8A8) variants also quantize activations and can therefore use
-low-precision tensor cores for the matrix multiply itself.}
 \end{table}
 
 \subsection{Workloads}
@@ -152,8 +152,13 @@ the latter, we added a fourth metric requiring real experimental data:
 Three ProteinGym substitution assays were selected to span the sequence-length
 range, since peak memory during masked-marginals scoring grows with $L$:
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{ProteinGym assays used. All 19{,}557 single-substitution variants had
+their stated wild-type residue verified against the reference \texttt{target\_seq}
+before use; all matched. This check is load-bearing --- an off-by-one in
+position indexing does not raise an error, it silently scores the wrong
+positions and yields a plausible-looking correlation.}
 \small
 \begin{tabular}{lrrrl}
 \toprule
@@ -164,11 +169,6 @@ Assay & $L$ & Singles & Masked positions & Coverage \\
 \texttt{HSP82\_YEAST\_Flynn\_2019}    & 709 & 13{,}194 & 707 & 100\% \\
 \bottomrule
 \end{tabular}
-\caption{ProteinGym assays used. All 19{,}557 single-substitution variants had
-their stated wild-type residue verified against the reference \texttt{target\_seq}
-before use; all matched. This check is load-bearing --- an off-by-one in
-position indexing does not raise an error, it silently scores the wrong
-positions and yields a plausible-looking correlation.}
 \end{table}
 
 \subsection{Full benchmark data}
@@ -220,7 +220,7 @@ correctly classified as noise, a genuine improvement as real.
 
 \subsection{Hardware and software environment}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
 \small
 \begin{tabular}{ll}
@@ -259,8 +259,10 @@ scheme but the \texttt{torch.compile} mode. Measured on a single ESM2-3B-shaped
 feed-forward block, $2560 \to 10240 \to 2560$, at batch $32 \times 512$ on an
 A100:
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Only \texttt{max-autotune} allows Inductor to autotune the INT8 Triton
+matmuls, which is where the entire W8A8 benefit resides.}
 \small
 \begin{tabular}{lr}
 \toprule
@@ -274,8 +276,6 @@ bf16 compiled                                & 7.91 \\
 \cfg{int8\_dyn} \texttt{mode="max-autotune"} & \best{5.43} \\
 \bottomrule
 \end{tabular}
-\caption{Only \texttt{max-autotune} allows Inductor to autotune the INT8 Triton
-matmuls, which is where the entire W8A8 benefit resides.}
 \end{table}
 
 Measured in eager mode, W8A8 appears $4.2\times$ \emph{slower} than bf16 and
@@ -288,8 +288,12 @@ kernel-selection effect rather than a Dynamo fallback.
 
 \subsection{Bulk embedding extraction}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{ESM2-3B, H200, compiled with \texttt{max-autotune-no-cudagraphs}, SDPA
+attention, 64 sequences of length 512--1024 under a 16{,}384-token budget.
+Reproduced across four independent jobs: bf16 mean 56{,}642 residues/s, range
+55{,}941--57{,}422 ($\pm 1.3\%$); fp32 mean 6{,}742, range 6{,}687--6{,}814.}
 \small
 \begin{tabular}{lrrrrrrr}
 \toprule
@@ -304,10 +308,6 @@ Config & Weights & Peak & Residues/s & vs bf16 & Emb.\ cos & Logit KL & DMS $\rh
 \cfg{int4\_wo}    & \best{1.61} &  7.69 &  3{,}813 & 0.07$\times$ & 0.998904 & 1.89e--03 & 0.9975 \\
 \bottomrule
 \end{tabular}
-\caption{ESM2-3B, H200, compiled with \texttt{max-autotune-no-cudagraphs}, SDPA
-attention, 64 sequences of length 512--1024 under a 16{,}384-token budget.
-Reproduced across four independent jobs: bf16 mean 56{,}642 residues/s, range
-55{,}941--57{,}422 ($\pm 1.3\%$); fp32 mean 6{,}742, range 6{,}687--6{,}814.}
 \end{table}
 
 Three observations. First, the \textbf{fp32 $\to$ bf16 step is worth
@@ -329,8 +329,10 @@ a larger effect than several of the quantization differences in the table.
 
 \subsection{DMS scoring: the opposite conclusion}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{DMS scoring throughput, ESM2-3B, uncompiled. bf16 wins at every problem
+size; quantization is pure overhead in this regime.}
 \small
 \begin{tabular}{lrrr}
 \toprule
@@ -346,8 +348,6 @@ Config & \multicolumn{3}{c}{Variants/s} \\
 \cfg{int4\_wo}  & 1{,}045 &   282 &   112 \\
 \bottomrule
 \end{tabular}
-\caption{DMS scoring throughput, ESM2-3B, uncompiled. bf16 wins at every problem
-size; quantization is pure overhead in this regime.}
 \end{table}
 
 bf16 is fastest at every assay size, and \cfg{int8\_dyn} --- the second-fastest
@@ -364,8 +364,11 @@ that is indefensible at $L=72$.
 
 \subsection{Memory during DMS scoring}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Peak device memory during DMS scoring. Weights account for
+approximately 90\% of peak even at $L=709$ (bf16: 5.29\,GB weights against
+0.59\,GB activations).}
 \small
 \begin{tabular}{lrrrr}
 \toprule
@@ -379,9 +382,6 @@ Config & Weights (GB) & Peak $L{=}72$ & Peak $L{=}286$ & Peak $L{=}709$ \\
 \cfg{int4\_wo}  & \best{1.61} & \best{1.70} & \best{1.87} & \best{2.20} \\
 \bottomrule
 \end{tabular}
-\caption{Peak device memory during DMS scoring. Weights account for
-approximately 90\% of peak even at $L=709$ (bf16: 5.29\,GB weights against
-0.59\,GB activations).}
 \end{table}
 
 This is the reverse of the bulk-extraction situation. Masked-marginals scoring
@@ -393,8 +393,11 @@ smallest footprint at every length --- $2.7\times$ below bf16.
 \subsection{Ground-truth accuracy on ProteinGym}
 \label{sec:gt}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Spearman correlation against experimental measurements, ESM2-3B.
+$\Delta$ is the change from fp32, with a 2000-sample paired bootstrap over
+variants. ``Real'' indicates the 95\% confidence interval excludes zero.}
 \small
 \begin{tabular}{llrrrl}
 \toprule
@@ -422,9 +425,6 @@ HSP82      & \cfg{fp32}      & 0.2931 & (ref)    &                      &  \\
            & \cfg{int4\_wo}  & 0.2904 & $-0.0027$ & $[-0.0057, +0.0002]$ & noise \\
 \bottomrule
 \end{tabular}
-\caption{Spearman correlation against experimental measurements, ESM2-3B.
-$\Delta$ is the change from fp32, with a 2000-sample paired bootstrap over
-variants. ``Real'' indicates the 95\% confidence interval excludes zero.}
 \end{table}
 
 Two findings emerge, and the second qualifies the first.
@@ -473,7 +473,7 @@ An incidental observation deserves note, because it bears directly on how much
 any of this matters. The fp32 650M model correlates with experiment
 \emph{better} than the fp32 3B model on two of the three assays:
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
 \small
 \begin{tabular}{lrrr}
@@ -518,8 +518,12 @@ evidence. The two intervals turned out to agree to the fourth decimal, so the
 clustering was immaterial here; it is reported because that had to be measured
 rather than assumed.
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Mean Spearman against experiment over 201 assays. Bold marks intervals
+excluding zero under the protein-clustered paired bootstrap. Note that
+\cfg{int4\_wo} is significant in \emph{opposite directions} on the two model
+scales.}
 \small
 \begin{tabular}{lrrlrrl}
 \toprule
@@ -535,18 +539,16 @@ fp32              & 0.4398 & ---     & (ref)              & 0.4459 & ---     & (
 \cfg{int4\_wo}    & 0.4435 & $\mathbf{+0.0037}$ & $[+0.0007,+0.0068]$ & 0.4395 & $\mathbf{-0.0064}$ & $[-0.0105,-0.0018]$ \\
 \bottomrule
 \end{tabular}
-\caption{Mean Spearman against experiment over 201 assays. Bold marks intervals
-excluding zero under the protein-clustered paired bootstrap. Note that
-\cfg{int4\_wo} is significant in \emph{opposite directions} on the two model
-scales.}
 \end{table}
 
 \subsubsection*{The benchmark mean is the wrong safety criterion}
 
 Every $\Delta$ in that table is below $0.007$. The per-assay tail is not.
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Worst single-assay change in ground-truth correlation, and count of
+assays moving by more than $0.05$, out of 201.}
 \small
 \begin{tabular}{lrrrr}
 \toprule
@@ -561,8 +563,6 @@ Config & worst $\Delta$ & $|\Delta|>0.05$ & worst $\Delta$ & $|\Delta|>0.05$ \\
 \cfg{int4\_wo}  & $-0.0556$ & 5 & $\mathbf{-0.2024}$ & 6 \\
 \bottomrule
 \end{tabular}
-\caption{Worst single-assay change in ground-truth correlation, and count of
-assays moving by more than $0.05$, out of 201.}
 \end{table}
 
 \cfg{int8\_dyn} at 3B is indistinguishable from fp32 on the benchmark mean
@@ -598,8 +598,10 @@ three assays cannot support.
 
 \subsubsection*{Speed and memory over the whole benchmark}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
+\caption{Full 201-assay benchmark, ESM2-3B on one H200, uncompiled. Wall-clock
+is summed scoring time over all assays.}
 \small
 \begin{tabular}{lrrrr}
 \toprule
@@ -613,8 +615,6 @@ fp32            & 45.0 min & 25.6  & 11.10 GB & 12.20 GB \\
 \cfg{int4\_wo}  & 73.8 min & 17.3  & \textbf{1.82 GB} & \textbf{2.37 GB} \\
 \bottomrule
 \end{tabular}
-\caption{Full 201-assay benchmark, ESM2-3B on one H200, uncompiled. Wall-clock
-is summed scoring time over all assays.}
 \end{table}
 
 The DMS recommendation from three assays survives and strengthens: \cfg{bf16}
@@ -637,7 +637,7 @@ slowest --- an exact inversion of the bulk-throughput column. Two successive
 fixes failed. Direct instrumentation finally established the cause. On
 650M/A100 with a 40-residue wild type over 11 masked positions:
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
 \small
 \begin{tabular}{lr}
@@ -672,7 +672,7 @@ buckets inside the timed region.
 Peak memory during DMS scoring was reported as follows, with the activation
 overhead implied by subtracting weights:
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
 \small
 \begin{tabular}{lrrr}
@@ -779,7 +779,7 @@ $0.018$ across 402 assay/model pairs), \cfg{fp8\_dyn} is nearly so ($0.034$), an
 
 \subsection{Recommendations}
 
-\begin{table}[h]
+\begin{table}[htb]
 \centering
 \small
 \begin{tabular}{ll}

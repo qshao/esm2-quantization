@@ -53,8 +53,8 @@ were meant to measure.
 ================================================================================
 COMMENTS FIELD (optional but recommended)
 ================================================================================
-18 pages, 3 figures, 10 tables. Code and per-variant predictions for all 201
-ProteinGym assays available at [INSERT URL/DOI].
+21 pages, 3 figures, 3 algorithms, 16 tables. Code and per-variant
+predictions for all 201 ProteinGym assays available at [INSERT URL/DOI].
 
 ================================================================================
 LICENSE

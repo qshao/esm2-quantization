@@ -1,6 +1,6 @@
 # arXiv submission checklist
 
-Build: `./build.sh` → `esm2_quantization.pdf` (18 pp) and `arxiv-submission.tar.gz` (172 KB).
+Build: `./build.sh` → `esm2_quantization.pdf` (21 pp) and `arxiv-submission.tar.gz` (176 KB).
 
 Upload **`arxiv-submission.tar.gz`**, not the PDF. arXiv runs its own `pdflatex`
 on the source; a PDF-only submission is accepted but flagged as lower quality and
@@ -31,15 +31,17 @@ mismatch stalls the submission in moderation.
 ## Verified
 
 - Compiles standalone from the tarball alone — extracted to a clean directory
-  and built with no access to this repo: 18 pages, **no undefined references or
+  and built with no access to this repo: 21 pages, **no undefined references or
   citations**.
 - Fonts fully embedded: Type1 (LaTeX) + TrueType (figures), **no Type3**.
   Figures are generated with `pdf.fonttype 42` for exactly this reason.
 - Only standard TeX Live packages: `geometry`, `booktabs`, `amsmath`,
-  `graphicx`, `xcolor`, `microtype`, `caption`, `array`, `natbib`, `hyperref`.
+  `graphicx`, `xcolor`, `microtype`, `caption`, `array`, `natbib`, `hyperref`,
+  `algorithm`, `algpseudocode`.
 - Bibliography is an inline `thebibliography`, **not** BibTeX — so there is no
   `.bbl` to ship and no chance of arXiv failing to resolve a `.bib`.
-- 2 overfull hboxes remain (16 pt and 11 pt); cosmetic, no visual defect.
+- 1 overfull hbox remains (16 pt); cosmetic, no visual defect.
+- All table captions sit **above** the table body; figure captions below.
 
 ## Notes
 
