@@ -21,6 +21,10 @@ MODELS = {
     "650M": "facebook/esm2_t33_650M_UR50D",
     "3B": "facebook/esm2_t36_3B_UR50D",
     "150M": "facebook/esm2_t30_150M_UR50D",  # smoke-test size
+    # 48 layers x 5120 hidden = 5.33x the per-token compute of 3B, and a 60.5 GB
+    # download. fp32 peaks near 54 GB, so it needs an H200; on an 80 GB A100 the
+    # fp32 reference will not fit alongside its activations.
+    "15B": "facebook/esm2_t48_15B_UR50D",
 }
 
 

@@ -1,0 +1,16 @@
+=== node ghnode001 | model 15B | config bf16 | array task 1 ===
+NVIDIA H200, 143771 MiB, 550.54.14
+torch 2.6.0+cu124 | cc (9, 0)
+
+[setup] model=15B config=bf16 device=cuda
+[setup] 3 assays within max_len=1022, 0 skipped as too long, 0 already done -> 3 to score
+[setup] out=results/pgym_smoke15b/15B_bf16.jsonl.gz
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/7 [00:00<?, ?it/s]Loading checkpoint shards:  14%|█▍        | 1/7 [01:02<06:14, 62.37s/it]Loading checkpoint shards:  29%|██▊       | 2/7 [02:13<05:37, 67.51s/it]Loading checkpoint shards:  43%|████▎     | 3/7 [03:30<04:47, 71.94s/it]Loading checkpoint shards:  57%|█████▋    | 4/7 [04:46<03:40, 73.64s/it]Loading checkpoint shards:  71%|███████▏  | 5/7 [06:02<02:28, 74.38s/it]Loading checkpoint shards:  86%|████████▌ | 6/7 [07:18<01:15, 75.06s/it]Loading checkpoint shards: 100%|██████████| 7/7 [07:29<00:00, 54.05s/it]Loading checkpoint shards: 100%|██████████| 7/7 [07:29<00:00, 64.25s/it]
+[load] 461.7s  weights 28.18 GB
+[1/3] TCRG1_MOUSE_Tsuboyama_2023_1E0L               L=   37 n=   1058 pos=   35     0.2s peak=28.27GB | eta 0 min
+[2/3] BLAT_ECOLX_Stiffler_2015                      L=  286 n=   4996 pos=  263     5.1s peak=28.66GB | eta 0 min
+[3/3] MSH2_HUMAN_Jia_2020                           L=  934 n=  16749 pos=  934    61.2s peak=29.69GB | eta 0 min
+
+[done] bf16: 3 assays in 1.1 min -> results/pgym_smoke15b/15B_bf16.jsonl.gz
+=== done: 15B/bf16 (job 5395117) ===

@@ -1,0 +1,17 @@
+=== node ghnode002 | model 15B | config fp8_dyn | array task 4 ===
+NVIDIA H200, 143771 MiB, 550.54.14
+torch 2.6.0+cu124 | cc (9, 0)
+
+[setup] model=15B config=fp8_dyn device=cuda
+[setup] 3 assays within max_len=1022, 0 skipped as too long, 0 already done -> 3 to score
+[setup] out=results/pgym_smoke15b/15B_fp8_dyn.jsonl.gz
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/7 [00:00<?, ?it/s]Loading checkpoint shards:  14%|█▍        | 1/7 [00:13<01:18, 13.05s/it]Loading checkpoint shards:  29%|██▊       | 2/7 [00:49<02:14, 26.83s/it]Loading checkpoint shards:  43%|████▎     | 3/7 [01:28<02:09, 32.41s/it]Loading checkpoint shards:  57%|█████▋    | 4/7 [02:07<01:44, 34.95s/it]Loading checkpoint shards:  71%|███████▏  | 5/7 [02:45<01:12, 36.06s/it]Loading checkpoint shards:  86%|████████▌ | 6/7 [03:22<00:36, 36.53s/it]Loading checkpoint shards: 100%|██████████| 7/7 [03:29<00:00, 26.63s/it]Loading checkpoint shards: 100%|██████████| 7/7 [03:29<00:00, 29.88s/it]
+[quant] fp8_dyn: applied torchao to 288 encoder Linears
+[load] 223.3s  weights 14.12 GB
+[1/3] TCRG1_MOUSE_Tsuboyama_2023_1E0L               L=   37 n=   1058 pos=   35     0.5s peak=14.22GB | eta 0 min
+[2/3] BLAT_ECOLX_Stiffler_2015                      L=  286 n=   4996 pos=  263     5.1s peak=14.69GB | eta 0 min
+[3/3] MSH2_HUMAN_Jia_2020                           L=  934 n=  16749 pos=  934    57.9s peak=15.91GB | eta 0 min
+
+[done] fp8_dyn: 3 assays in 1.1 min -> results/pgym_smoke15b/15B_fp8_dyn.jsonl.gz
+=== done: 15B/fp8_dyn (job 5395120) ===

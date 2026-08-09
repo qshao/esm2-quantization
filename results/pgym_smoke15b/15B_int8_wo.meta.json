@@ -1,0 +1,15 @@
+{
+  "model": "15B",
+  "config": "int8_wo",
+  "device": "cuda",
+  "attn": "sdpa",
+  "weight_gb": 14.138,
+  "load_seconds": 466.8,
+  "max_len": 1022,
+  "dms_batch": 8,
+  "n_assays": 3,
+  "skipped_too_long": [],
+  "slurm_jobs": [
+    "5395118"
+  ]
+}
