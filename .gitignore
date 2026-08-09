@@ -34,3 +34,8 @@ preprint/arxiv-submission.tar.gz
 
 # 258 KB of pip output
 env/setup.log
+
+# Credentials. Never commit.
+token
+*.token
+.gh.curlrc
