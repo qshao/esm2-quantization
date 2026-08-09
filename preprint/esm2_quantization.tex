@@ -132,7 +132,24 @@ This paper addresses three questions:
         which inverted the quantity being measured while producing plausible,
         monotonic result tables --- offered as reusable hazards rather than as
         local mistakes.
-  \item Open code, per-variant predictions for all 18 model/configuration
+  \item The finding that the one catastrophic failure we observe is a
+        \textbf{defect of default symmetric activation scaling, not of W8A8}:
+        asymmetric activation quantization --- one keyword, no calibration ---
+        removes all six damaged assays and improves worst-case drift from
+        $\rho_{\text{fp32}} = 0.393$ to $0.965$, and SmoothQuant does the same
+        at higher cost. ``Avoid INT8 dynamic quantization'' would have been the
+        wrong conclusion from the same benchmark.
+  \item A \textbf{label-free screen} for which targets are at risk. The
+        perturbation measured relative to the spread of the scores it perturbs
+        separates damage cleanly across 3015 combinations: no combination above
+        $\mathrm{SNR} = 8$ loses more than $0.05$ Spearman, and every collapse
+        beyond $0.10$ falls below $1.7$. It needs one extra scoring pass and no
+        experimental data.
+  \item Evidence that the pipeline is \textbf{exactly reproducible}: 8
+        replicate runs on different GPUs give bitwise-identical scores over
+        19.3M comparisons, so the reported differences are properties of the
+        configurations rather than of the runs.
+  \item Open code, per-variant predictions for all 21 model/configuration
         combinations, and per-assay statistics (Section~\ref{sec:avail}).
 \end{itemize}
 
@@ -1251,6 +1268,21 @@ Config & mean $\Delta$ & worst $\Delta$ & $|\Delta|>0.05$ & worst $\rho_{\text{f
 \end{tabular}
 \end{table}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_w8a8.pdf}
+\caption{\textbf{(a)} Per-assay change in ground-truth correlation for the three
+W8A8 variants over all 201 assays at 3B; shaded bands mark $|\Delta\rho| > 0.05$
+and black ticks the benchmark mean. Symmetric activation scaling owns the entire
+tail, and both repairs remove it while leaving the mean essentially unchanged
+--- the defect is invisible in the statistic most likely to be reported.
+\textbf{(b)} Drift from fp32 for every assay, ranked worst-first. The separation
+is not confined to the tail: symmetric scaling is worse across the whole
+distribution, roughly threefold at the median, which is why its damage is
+predictable in hindsight and yet absent from its mean.}
+\label{fig:w8a8}
+\end{figure}
+
 On the two assays that collapse, \cfg{int8\_dyn}'s $-0.3688$ and $-0.1268$
 become $+0.0102$ and $-0.0164$ under asymmetric scaling and $+0.0034$ and
 $-0.0098$ under SmoothQuant, with fidelity against fp32 on the worst assay
@@ -1305,6 +1337,20 @@ $> 8$   & 2233 & 0.0019 &  \textbf{0.0\%} & $-0.0409$ \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.72\textwidth]{fig_snr.pdf}
+\caption{Signal-to-perturbation ratio against realised damage, for all 3015
+assay/configuration/scale combinations. The upper-right quadrant --- high SNR
+\emph{and} material damage --- is empty: no combination above $\mathrm{SNR} = 8$
+loses more than $0.05$ Spearman. The relationship is monotone but noisy in the
+other direction, so a low SNR is a warning rather than a verdict. Colour marks
+the configuration, and the ordering left-to-right recovers their aggressiveness
+without being told it, which is a check that the quantity measures what it is
+supposed to.}
+\label{fig:snr}
+\end{figure}
 
 This is a better screen than the raw drift test in Algorithm~\ref{alg:select},
 because it is calibrated: $\rho_{\text{fp32}}$ bounds how far an answer can move
@@ -1584,6 +1630,34 @@ reading that sensitivity falls with model size; the third removes it. A
 configuration cannot be genuinely more accurate than the reference from which it
 is derived in any way one could rely on in advance.
 
+\subsection{A failure worth diagnosing is worth trying to fix}
+
+The first version of this study stopped at ``\cfg{int8\_dyn} destroys one assay,
+so avoid it''. That is a defensible reading of the benchmark and it is wrong in
+a way that matters: the collapse is a property of one scaling choice inside the
+configuration, not of the configuration, and certainly not of W8A8 on encoders.
+Switching the activation mapping from symmetric to asymmetric --- a keyword
+argument --- removes every damaged assay (Section~\ref{sec:w8a8fix}).
+
+We think the general lesson is about what a benchmark result licenses. Measuring
+that a configuration fails establishes that it fails \emph{as configured}; it
+does not establish that the approach is unusable, and the distance between those
+two claims is one experiment. A study that reports only the ranking leaves the
+reader unable to tell which of them it has shown. It is worth noting how close
+we came to publishing the stronger claim: the collapse is dramatic, the
+explanation ``W8A8 is too aggressive for this model'' is available and
+plausible, and nothing in the benchmark contradicts it.
+
+The diagnostic that failed is instructive too. We looked for the textbook
+activation-outlier signature on the collapsing assay and did not find one ---
+its largest activation is \emph{smaller} than every control's. Had we stopped
+there we would have concluded that outliers were not the mechanism, and the
+successful repair by two methods that both target activation scaling shows that
+conclusion would also have been wrong. The diagnostic was averaging over 180
+Linear layers, which is the wrong resolution for a defect concentrated in a few.
+Negative results from aggregate statistics are weak evidence about localised
+phenomena, and we report ours as such rather than as a finding.
+
 \subsection{Averages conceal the failure that matters}
 
 The benchmark-mean result is that no configuration changes mean ground-truth
@@ -1656,9 +1730,12 @@ experimental labels, so it costs one extra scoring pass and no wet-lab work.
 
 \begin{algorithm}[htb]
 \caption{Choosing a precision configuration for a variant-effect workload. The
-screen requires no ground-truth labels, because Section~\ref{sec:fidelity} establishes that
-drift from fp32 is a valid bound on how far the answer can move even though it
-does not indicate direction.}
+screen requires no ground-truth labels, because Section~\ref{sec:fidelity}
+establishes that drift from fp32 bounds how far the answer can move even though
+it does not indicate direction. The SNR test added at the third line is what
+converts that bound into a decision: drift alone is uncalibrated, since the same
+absolute movement is harmless on an assay with a wide score distribution and
+fatal on a narrow one (Section~\ref{sec:snr}).}
 \label{alg:select}
 \begin{algorithmic}[1]
 \Require target protein(s) $S$, tolerance $\tau$ on Spearman drift, memory budget $m$
@@ -1670,7 +1747,12 @@ does not indicate direction.}
   \State $\rho_c \gets \mathrm{Spearman}\big(\sigma_c(V_S),\; \sigma_{\text{fp32}}(V_S)\big)$
          \label{ln:screen}
          \Comment{one scoring pass; no labels needed}
-  \State \textbf{if} $1 - \rho_c \leq \tau$ \textbf{then return} $c$
+  \State $\mathrm{SNR}_c \gets \mathrm{sd}(\sigma_{\text{fp32}}(V_S)) \,/\,
+         \mathrm{sd}(\sigma_c(V_S) - \sigma_{\text{fp32}}(V_S))$
+         \Comment{same pass, no extra cost}
+  \State \textbf{if} $1 - \rho_c \leq \tau$ \textbf{and} $\mathrm{SNR}_c > 8$
+         \textbf{then return} $c$
+         \Comment{no combination above 8 was damaged}
 \EndFor
 \State \textbf{if} $m$ still unmet: use \cfg{int4\_wo} \textbf{only} after
        confirming $1-\rho_c \le \tau$ on \emph{this} target
@@ -1744,6 +1826,14 @@ three would have saved a further thirteen and left a third.
         general recommendation and the wrong one for a specific target; a
         practitioner should run the per-target screen regardless of what the
         frontier says.
+  \item \textbf{The SNR screen is validated in-sample.} Its thresholds are read
+        off the same 3015 combinations they are evaluated on, so the $0\%$
+        damage rate above $\mathrm{SNR} = 8$ is an in-sample figure and the
+        cut-point is not calibrated on held-out data. It should be treated as a
+        heuristic with a demonstrated direction, not as a guaranteed bound.
+  \item \textbf{The asymmetric repair is measured at one scale.} The W8A8
+        comparison is 3B only; we did not re-run it at 650M or 15B, so the
+        repair is established where the failure was and not shown to be general.
   \item \textbf{The signal threshold is arbitrary.} Conditioning the tail on
         $\rho_{\text{fp32}} > 0.3$ is a judgement call. We report the
         sensitivity across cuts from $0.0$ to $0.4$; the 3B \cfg{int8\_dyn}
@@ -1868,7 +1958,7 @@ The following are released with this work:
   \item Benchmark harness, scoring driver, and analysis code, including the
         extraction script that validates every variant's wild-type residue
         against \texttt{target\_seq} before writing.
-  \item \textbf{Per-variant predictions} for all 18 model/configuration
+  \item \textbf{Per-variant predictions} for all 21 model/configuration
         combinations: $2{,}413{,}913$ scores each, in the canonical assay row
         order, so that any alternative statistic can be recomputed without
         access to a GPU.

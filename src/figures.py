@@ -268,6 +268,83 @@ def fig_dominance():
     plt.close(fig)
 
 
+def fig_w8a8():
+    """The int8_dyn collapse and its repair, per assay."""
+    X = pd.read_csv(os.path.join(ROOT, "results", "proteingym",
+                                 "w8a8_remedies.csv"))
+    V = [("int8_dyn", "int8_dyn\n(symmetric)", "#CC79A7"),
+         ("int8_dyn_asym", "int8_dyn_asym", "#009E73"),
+         ("int8_dyn_sq", "int8_dyn\n+SmoothQuant", "#0072B2")]
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.8))
+    rng = np.random.default_rng(0)
+
+    ax = axes[0]
+    for i, (c, lab, col) in enumerate(V):
+        d = X[f"delta_{c}"].to_numpy()
+        ax.scatter(d, i + rng.uniform(-0.2, 0.2, len(d)), s=4, alpha=0.55,
+                   color=col, linewidths=0)
+        ax.scatter([d.mean()], [i], marker="|", s=180, color="black", zorder=5)
+    ax.axvline(0, color="0.6", lw=0.7, zorder=0)
+    for lo, hi in [(-0.42, -0.05), (0.05, 0.12)]:
+        ax.axvspan(lo, hi, color="0.92", zorder=0)
+    ax.annotate("damaged: $|\\Delta\\rho| > 0.05$", (-0.235, 2.5), ha="center",
+                fontsize=6, color="0.45")
+    ax.annotate("$-0.369$", (-0.369, 0), textcoords="offset points",
+                xytext=(6, 9), fontsize=6.5, color=V[0][2])
+    ax.set_yticks(range(len(V)))
+    ax.set_yticklabels([v[1] for v in V], fontsize=6.5, family="monospace")
+    ax.set_ylim(-0.6, 2.75)
+    ax.set_xlim(-0.42, 0.12)
+    ax.invert_yaxis()
+    ax.set_xlabel(r"$\Delta\rho$ vs fp32 (per assay)")
+    ax.set_title("(a) the tail, and its repair")
+
+    # Fidelity is the quantity a practitioner can actually measure, so show
+    # where each variant's worst assay sits on it.
+    ax = axes[1]
+    for i, (c, lab, col) in enumerate(V):
+        f = np.sort(1.0 - X[f"fid_{c}"].to_numpy())[::-1]
+        ax.plot(np.arange(1, len(f) + 1), np.clip(f, 1e-6, None), color=col,
+                lw=1.5, label=lab.replace("\n", " "))
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("assays ranked by drift (worst first)")
+    ax.set_ylabel(r"infidelity  $1-\rho_{\mathrm{fp32}}$")
+    ax.set_title("(b) drift profile across assays")
+    ax.legend(frameon=False, fontsize=6, loc="lower left")
+    fig.text(0.5, -0.06, "Symmetric activation scaling owns the entire tail; "
+             "both repairs remove it.", ha="center", fontsize=7, color="0.3")
+    fig.subplots_adjust(wspace=0.34)
+    fig.savefig(os.path.join(OUT, "fig_w8a8.pdf"))
+    plt.close(fig)
+
+
+def fig_snr():
+    """A label-free screen: perturbation relative to signal predicts damage."""
+    R = pd.read_csv(os.path.join(ROOT, "results", "proteingym",
+                                 "snr_screen.csv"))
+    fig, ax = plt.subplots(figsize=(5.0, 3.0))
+    for c in CFGS:
+        g = R[R.config == c]
+        ax.scatter(g.snr, g.delta.abs().clip(1e-5), s=4, alpha=0.35,
+                   color=COL[c], linewidths=0, label=LBL[c])
+    ax.axhline(0.05, color="0.35", lw=0.9, ls="--")
+    ax.axvline(8, color="0.35", lw=0.9, ls=":")
+    ax.annotate("damage threshold 0.05", (1.05, 0.062), fontsize=6, color="0.35")
+    ax.annotate("no damaged point in this quadrant\n(all-clear: SNR > 8)",
+                (10.5, 0.19), fontsize=6, color="0.35")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(r"SNR $=\mathrm{sd}(\sigma_{\mathrm{fp32}})\,/\,"
+                  r"\mathrm{sd}(\sigma_{\mathrm{cand}}-\sigma_{\mathrm{fp32}})$")
+    ax.set_ylabel(r"$|\Delta\rho|$ vs experiment")
+    leg = ax.legend(frameon=False, fontsize=6, loc="lower left", markerscale=2.2)
+    for h in leg.legend_handles:
+        h.set_alpha(1)
+    fig.savefig(os.path.join(OUT, "fig_snr.pdf"))
+    plt.close(fig)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     models = {m: load(m) for m in ("650M", "3B", "15B")}
@@ -276,8 +353,11 @@ def main():
     fig_pareto()
     fig_scale()
     fig_dominance()
+    fig_w8a8()
+    fig_snr()
     for f in ("fig_tail.pdf", "fig_fidelity.pdf", "fig_pareto.pdf",
-              "fig_scale.pdf", "fig_dominance.pdf"):
+              "fig_scale.pdf", "fig_dominance.pdf",
+              "fig_w8a8.pdf", "fig_snr.pdf"):
         p = os.path.join(OUT, f)
         print(f"  {f:20s} {os.path.getsize(p) / 1024:6.1f} KB")
 

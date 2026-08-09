@@ -886,6 +886,27 @@ Config & mean $\Delta$ & worst $\Delta$ & $|\Delta|>0.05$ & worst $\rho_{\text{f
 \end{tabular}
 \end{table}
 
+\begin{figure}[htb]
+\centering
+\includegraphics[width=\textwidth]{fig_w8a8.pdf}
+\caption{\textbf{(a)} Per-assay $\Delta\rho$ for the three W8A8 variants;
+shaded bands mark $|\Delta\rho|>0.05$, black ticks the mean. Symmetric scaling
+owns the entire tail and both repairs remove it while the mean barely moves.
+\textbf{(b)} Drift from fp32, assays ranked worst-first: the separation is not
+confined to the tail --- symmetric is roughly threefold worse at the median.}
+\label{fig:w8a8}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.72\textwidth]{fig_snr.pdf}
+\caption{Signal-to-perturbation ratio against realised damage, 3015
+combinations. The upper-right quadrant is empty: nothing above $\mathrm{SNR}=8$
+loses more than $0.05$. Colour is the configuration, and their left-to-right
+ordering recovers their aggressiveness unprompted.}
+\label{fig:snr}
+\end{figure}
+
 Asymmetric scaling is the better remedy: no calibration, no prototype
 dependency, and $1.95\times$ faster than symmetric \cfg{int8\_dyn} in our
 measurements (20.6 against 40.0 minutes) at $0.6$\,GB more peak memory. We did
