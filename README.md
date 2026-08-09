@@ -392,6 +392,44 @@ fallback: 2.87 vs 5.50 GB, 69% of bf16 speed, max drift 0.016. `int8_dyn` and
 `int4_wo` are both slower *and* carry a catastrophic tail -- they are not
 trade-offs here, they are strictly worse.
 
+### Three model scales: 650M, 3B, 15B
+
+The full benchmark was run at all three ESM-2 scales (16.2 GPU-hours total).
+Two conclusions above are bounded by scale, which one model could not have
+revealed.
+
+**1. `int4_wo` has no consistent sign and no trend.**
+
+| model | delta vs fp32 | 95% CI (protein) | verdict |
+|---|---|---|---|
+| 650M | **-0.0064** | [-0.0105, -0.0018] | real |
+| 3B | **+0.0037** | [+0.0007, +0.0068] | real |
+| 15B | +0.0009 | [-0.0014, +0.0034] | noise |
+
+Harmful, then beneficial, then null. Two scales would have looked like
+"sensitivity falls with size"; the third removes that reading. At 15B **no**
+config shows a significant effect.
+
+**2. The workload conflict dissolves at 15B.** DMS speed relative to bf16:
+
+| config | 650M | 3B | 15B |
+|---|---|---|---|
+| int8_wo | 0.72x | 0.69x | 0.72x |
+| **fp8_dyn** | 0.30x | 0.44x | **0.97x** |
+| int8_dyn | 0.07x | 0.10x | 0.20x |
+| int4_wo | 0.16x | 0.09x | 0.07x |
+
+`fp8_dyn`'s overhead is per-call while useful work grows with hidden size, so by
+15B it matches bf16 at **half the memory** (14.6 vs 28.6 GB) -- making it the
+right choice for *both* workloads, which it is not at either smaller scale.
+**The DMS recommendation inverts: `bf16` up to 3B, `fp8_dyn` at 15B.**
+
+**3. Scale does not buy accuracy.** fp32 mean rho falls monotonically
+0.4459 -> 0.4398 -> 0.4323 across a 23x parameter increase; no pairwise
+difference is significant (15B-650M = -0.0137, p = 0.14). 15B costs 5.4x the
+compute of 3B for the lowest mean of the three, and its worst-case `bf16` drift
+is also larger (-0.032 vs -0.007).
+
 ### Model choice does NOT dominate precision choice
 
 An earlier 3-assay reading -- 650M beating 3B by 0.14 Spearman on BLAT -- suggested

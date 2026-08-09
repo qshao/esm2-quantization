@@ -29,31 +29,30 @@ We benchmark six numerical precision configurations for ESM-2 protein language
 models across three axes -- throughput, memory footprint, and predictive
 accuracy -- on two workloads with sharply different characteristics: bulk
 embedding extraction and deep mutational scanning (DMS) variant-effect scoring.
-For ESM2-3B on an H200, FP8 dynamic quantization delivers 1.15x the throughput
-of bf16 while halving peak memory (12.63 -> 7.24 GB), making it the best
-configuration for embedding extraction. The same configuration is a poor choice
-for DMS scoring, where bf16 in eager mode is fastest at every problem size and
-quantization is pure overhead. Accuracy is evaluated on the complete ProteinGym
-substitution benchmark -- 201 assays, 2.41M variants, both model scales -- with
-a paired bootstrap clustered on protein. Two findings follow. First, fidelity
-measured against fp32, the metric such studies normally report, predicts the
-magnitude of the change in real-world accuracy (r = 0.81 over 1005
-assay/configuration pairs) but not its sign: INT4 weight-only quantization is
-significantly beneficial at 3B and significantly harmful at 650M. Second, and of
-more practical consequence, no configuration shifts mean benchmark correlation
-by more than 0.007, yet INT8 dynamic quantization -- indistinguishable from fp32
-on that mean (p = 0.34) -- takes a single assay from rho = 0.591 to 0.223.
-Benchmark averages conceal precisely the failure that determines whether a
-configuration is deployable. We conclude that drift-from-fp32 metrics are sound
-risk bounds but unsound quality rankings, that configuration selection should be
-made on worst-case rather than mean behaviour, and we report four measurement
-artifacts encountered during this study, three of which inverted the result they
-were meant to measure.
+Accuracy is evaluated on the complete ProteinGym substitution benchmark -- 201
+assays, 2.41M variants -- at three model scales spanning 650M to 15B
+parameters, with a paired bootstrap clustered on protein. Three findings
+follow, and each contradicts a common practice. First, benchmark averages
+conceal the failure that decides deployability: no configuration shifts mean
+correlation by more than 0.007 at any scale, yet INT8 dynamic quantization --
+indistinguishable from fp32 on that mean at 3B (p = 0.34) -- takes a single
+assay from rho = 0.591 to 0.223. Selection must be made on worst-case, not
+mean, behaviour. Second, fidelity measured against fp32 bounds risk but cannot
+rank quality: over 3015 assay/configuration pairs it predicts the magnitude of
+ground-truth change (r = 0.56-0.81) but not its direction, and INT4
+weight-only quantization is significantly harmful at 650M, significantly
+beneficial at 3B, and indistinguishable from fp32 at 15B -- a reversal with no
+monotone trend to extrapolate. Third, the configuration ranking is itself
+scale-dependent: FP8 dynamic quantization runs at 0.30x bf16 speed for DMS at
+650M and 0.97x at 15B while halving memory, so the workload conflict that
+dominates at small scale dissolves at large scale. We also report four
+measurement artifacts encountered during this study, three of which inverted
+the result they were meant to measure.
 
 ================================================================================
 COMMENTS FIELD (optional but recommended)
 ================================================================================
-21 pages, 3 figures, 3 algorithms, 16 tables. Code and per-variant
+23 pages, 4 figures, 3 algorithms, 17 tables. Code and per-variant
 predictions for all 201 ProteinGym assays available at
 https://github.com/qshao/esm2-quantization
 

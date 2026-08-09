@@ -47,7 +47,7 @@ def load(model):
 
 def fig_tail(models):
     """The paper's central claim: benchmark means agree, tails do not."""
-    fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.7), sharex=True, sharey=True)
+    fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.7), sharex=True, sharey=True)
     rng = np.random.default_rng(0)
     for ax, (name, t) in zip(axes, models.items()):
         for i, c in enumerate(CFGS):
@@ -77,11 +77,11 @@ def fig_fidelity(models):
     fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.6))
     for ax, signed in zip(axes, (False, True)):
         for name, t in models.items():
-            m = "o" if name == "3B" else "^"
+            mk = {"650M": "^", "3B": "o", "15B": "s"}[name]
+            cl = {"650M": "#D55E00", "3B": "#0072B2", "15B": "#009E73"}[name]
             y = t["delta"] if signed else t["delta"].abs()
-            ax.scatter(t["infid"], y, s=4, alpha=0.4, marker=m, linewidths=0,
-                       color="#0072B2" if name == "3B" else "#D55E00",
-                       label=f"ESM2-{name}")
+            ax.scatter(t["infid"], y, s=4, alpha=0.35, marker=mk, linewidths=0,
+                       color=cl, label=f"ESM2-{name}")
         ax.set_xscale("log")
         ax.set_xlabel(r"infidelity  $1-\rho_{\mathrm{fp32}}$")
         ax.axhline(0, color="0.6", lw=0.7, zorder=0)
@@ -89,9 +89,9 @@ def fig_fidelity(models):
         for h in leg.legend_handles:
             h.set_alpha(1)
     axes[0].set_ylabel(r"$|\Delta\rho|$ vs experiment")
-    axes[0].set_title(r"magnitude: predictable ($r=0.81$ / $0.74$)")
+    axes[0].set_title(r"magnitude: predictable ($r=0.74/0.81/0.56$)")
     axes[1].set_ylabel(r"$\Delta\rho$ vs experiment (signed)")
-    axes[1].set_title(r"direction: not ($r=-0.58$ / $+0.10$)")
+    axes[1].set_title(r"direction: not ($r=+0.10/-0.58/-0.40$)")
     fig.savefig(os.path.join(OUT, "fig_fidelity.pdf"))
     plt.close(fig)
 
@@ -143,13 +143,59 @@ def fig_pareto():
     plt.close(fig)
 
 
+def fig_scale():
+    """The workload conflict is scale-dependent, and scale does not buy accuracy."""
+    ms = ["650M", "3B", "15B"]
+    x = [0, 1, 2]
+    spd = {m: {r["config"]: r["pos_per_s"] for r in
+               json.load(open(os.path.join(ROOT, "results", "proteingym",
+                                           f"summary_{m}.json")))["speed_ram"]}
+           for m in ms}
+    rho = {}
+    for m in ms:
+        t = pd.read_csv(os.path.join(ROOT, "results", "proteingym",
+                                     f"summary_{m}_per_assay.csv"))
+        rho[m] = t[t.config == "fp32"]["rho_expt"].mean()
+
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.6))
+    for c in ["fp8_dyn", "int8_wo", "int8_dyn", "int4_wo"]:
+        y = [spd[m][c] / spd[m]["bf16"] for m in ms]
+        axes[0].plot(x, y, "o-", color=COL[c], lw=1.4, ms=4, label=LBL[c])
+        axes[0].annotate(f"{y[-1]:.2f}x", (x[-1], y[-1]), textcoords="offset points",
+                         xytext=(5, -2), fontsize=6.5, color=COL[c])
+    axes[0].axhline(1.0, color=COL["bf16"], lw=1.2, ls="--")
+    # Placed right of centre: the legend occupies the upper-left corner.
+    axes[0].annotate("bf16 baseline", (0.42, 1.0), xycoords=("axes fraction", "data"),
+                     textcoords="offset points", xytext=(0, 4), fontsize=6.5,
+                     color=COL["bf16"], family="monospace")
+    axes[0].set_ylabel("DMS speed relative to bf16")
+    axes[0].set_title("quantization catches up with scale")
+    axes[0].legend(frameon=False, loc="upper left", ncol=2, columnspacing=1.0)
+    axes[0].set_ylim(0, 1.25)
+
+    axes[1].plot(x, [rho[m] for m in ms], "o-", color="black", lw=1.4, ms=5)
+    for i, m in enumerate(ms):
+        axes[1].annotate(f"{rho[m]:.4f}", (i, rho[m]), textcoords="offset points",
+                         xytext=(0, 7), fontsize=6.5, ha="center")
+    axes[1].set_ylabel(r"fp32 mean $\rho$ vs experiment")
+    axes[1].set_title("accuracy does not follow scale")
+    axes[1].set_ylim(0.428, 0.450)
+
+    for ax in axes:
+        ax.set_xticks(x); ax.set_xticklabels([f"ESM2-{m}" for m in ms])
+        ax.set_xlim(-0.25, 2.45); ax.set_xlabel("model scale")
+    fig.savefig(os.path.join(OUT, "fig_scale.pdf"))
+    plt.close(fig)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
-    models = {"3B": load("3B"), "650M": load("650M")}
+    models = {m: load(m) for m in ("650M", "3B", "15B")}
     fig_tail(models)
     fig_fidelity(models)
     fig_pareto()
-    for f in ("fig_tail.pdf", "fig_fidelity.pdf", "fig_pareto.pdf"):
+    fig_scale()
+    for f in ("fig_tail.pdf", "fig_fidelity.pdf", "fig_pareto.pdf", "fig_scale.pdf"):
         p = os.path.join(OUT, f)
         print(f"  {f:20s} {os.path.getsize(p) / 1024:6.1f} KB")
 

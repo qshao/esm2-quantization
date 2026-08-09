@@ -1,0 +1,32 @@
+{
+  "model": "15B",
+  "config": "fp32",
+  "device": "cuda",
+  "attn": "sdpa",
+  "weight_gb": 56.36,
+  "load_seconds": 357.5,
+  "max_len": 1022,
+  "dms_batch": 8,
+  "n_assays": 201,
+  "skipped_too_long": [
+    "A0A140D2T1_ZIKV_Sourisseau_2019",
+    "BRCA1_HUMAN_Findlay_2018",
+    "BRCA2_HUMAN_Erwood_2022_HEK293T",
+    "CAR11_HUMAN_Meitlis_2020_gof",
+    "CAR11_HUMAN_Meitlis_2020_lof",
+    "CAS9_STRP1_Spencer_2017_positive",
+    "ERBB2_HUMAN_Elazar_2016",
+    "KCNH2_HUMAN_Kozek_2020",
+    "NPC1_HUMAN_Erwood_2022_HEK293T",
+    "NPC1_HUMAN_Erwood_2022_RPE1",
+    "POLG_CXB3N_Mattenberger_2021",
+    "POLG_HCVJF_Qi_2014",
+    "SCN5A_HUMAN_Glazer_2019",
+    "SPIKE_SARS2_Starr_2020_binding",
+    "SPIKE_SARS2_Starr_2020_expression",
+    "UBE4B_MOUSE_Starita_2013"
+  ],
+  "slurm_jobs": [
+    "5395123"
+  ]
+}
