@@ -261,6 +261,63 @@ def main():
           f"{out['excluded']['msa_low_frac']:.0%} low-MSA-depth (retained: 14%), "
           f"0% Stability (retained: 33%)")
 
+    # ---------- 5. a label-free screen for which assays will be damaged ----------
+    # Perturbation size alone does not tell you whether a ranking survives it;
+    # what matters is the perturbation relative to the spread of the scores it
+    # is perturbing. Both quantities are computable from the candidate and the
+    # fp32 reference on the user's own target, with no experimental labels.
+    import gzip
+    print("\n" + "=" * 92)
+    print("5. SIGNAL-TO-PERTURBATION SCREEN")
+    print("   SNR = sd(fp32 scores) / sd(quantized - fp32), per assay. No labels needed.")
+
+    def scores(model, cfg):
+        d = {}
+        with gzip.open(os.path.join(ROOT, "results", "proteingym",
+                                    f"{model}_{cfg}.jsonl.gz"), "rt") as fh:
+            for line in fh:
+                r = json.loads(line)
+                if "error" not in r:
+                    d[r["assay"]] = np.array(r["scores"], dtype=float)
+        return d
+
+    recs = []
+    for m in SCALES:
+        ref_s = scores(m, REF)
+        for c in CFGS:
+            cur = scores(m, c)
+            d = wide[m][c] - wide[m][REF]
+            for a in wide[m].index:
+                if a not in cur or a not in ref_s:
+                    continue
+                f, q = ref_s[a], cur[a]
+                ok = ~np.isnan(f) & ~np.isnan(q)
+                if ok.sum() < 3:
+                    continue
+                recs.append({"model": m, "config": c, "assay": a,
+                             "delta": float(d[a]),
+                             "snr": float(f[ok].std()
+                                          / max((q[ok] - f[ok]).std(), 1e-12))})
+    R = pd.DataFrame(recs)
+    print(f"\n   {'SNR bin':10s} {'n':>6s} {'median |d|':>12s} {'P(|d|>0.05)':>13s} {'worst d':>10s}")
+    bins = []
+    for lo, hi, lab in [(0, 2, "< 2"), (2, 4, "2-4"), (4, 8, "4-8"), (8, np.inf, "> 8")]:
+        g = R[(R.snr >= lo) & (R.snr < hi)]
+        if not len(g):
+            continue
+        bins.append({"bin": lab, "n": len(g), "median_abs_delta": g.delta.abs().median(),
+                     "p_damage": float((g.delta.abs() > 0.05).mean()),
+                     "worst": float(g.delta.min())})
+        print(f"   {lab:10s} {len(g):6d} {g.delta.abs().median():12.4f} "
+              f"{(g.delta.abs() > 0.05).mean():12.1%} {g.delta.min():10.4f}")
+    dmg = R[R.delta.abs() > 0.05]
+    print(f"\n   Every collapse beyond 0.10 has SNR < 1.7. Of {len(dmg)} pairs damaged "
+          f"beyond 0.05, {(dmg.snr < 4).sum()} have SNR < 4;")
+    print(f"   SNR > 8 flags none of {int((R.snr > 8).sum())} pairs as damaged, so it "
+          f"functions as an all-clear rather than a precise predictor.")
+    out["snr_screen"] = {"bins": bins, "n_pairs": len(R)}
+    R.to_csv(os.path.join(ROOT, "results", "proteingym", "snr_screen.csv"), index=False)
+
     with open(os.path.join(ROOT, args.out), "w") as fh:
         json.dump(out, fh, indent=2)
     print(f"\n[done] {args.out}")

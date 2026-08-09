@@ -1,0 +1,57 @@
+[
+  {
+    "n_linears": 216,
+    "outlier_ratio_median": 16.832639694213867,
+    "outlier_ratio_p95": 310.25164794921875,
+    "outlier_ratio_max": 2921875200.0,
+    "kurtosis_median": 567.9949493408203,
+    "absmax_max": 14.75,
+    "assay": "UBR5_HUMAN_Tsuboyama_2023_1I2T",
+    "role": "COLLAPSE",
+    "seq_len": 58
+  },
+  {
+    "n_linears": 216,
+    "outlier_ratio_median": 17.027210235595703,
+    "outlier_ratio_p95": 456.9134979248047,
+    "outlier_ratio_max": 6187500032.0,
+    "kurtosis_median": 477.96031188964844,
+    "absmax_max": 17.5,
+    "assay": "DNJA1_HUMAN_Tsuboyama_2023_2LO1",
+    "role": "control",
+    "seq_len": 65
+  },
+  {
+    "n_linears": 216,
+    "outlier_ratio_median": 15.523646354675293,
+    "outlier_ratio_p95": 298.3948974609375,
+    "outlier_ratio_max": 3640625152.0,
+    "kurtosis_median": 297.3127899169922,
+    "absmax_max": 15.1875,
+    "assay": "PR40A_HUMAN_Tsuboyama_2023_1UZC",
+    "role": "control",
+    "seq_len": 63
+  },
+  {
+    "n_linears": 216,
+    "outlier_ratio_median": 17.08333396911621,
+    "outlier_ratio_p95": 448.3095397949219,
+    "outlier_ratio_max": 7281250304.0,
+    "kurtosis_median": 556.9771118164062,
+    "absmax_max": 14.875,
+    "assay": "SPTN1_CHICK_Tsuboyama_2023_1TUD",
+    "role": "control",
+    "seq_len": 60
+  },
+  {
+    "n_linears": 216,
+    "outlier_ratio_median": 17.160550117492676,
+    "outlier_ratio_p95": 320.1749038696289,
+    "outlier_ratio_max": 4937500160.0,
+    "kurtosis_median": 453.8769836425781,
+    "absmax_max": 16.625,
+    "assay": "YAIA_ECOLI_Tsuboyama_2023_2KVT",
+    "role": "control",
+    "seq_len": 52
+  }
+]

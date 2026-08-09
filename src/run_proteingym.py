@@ -107,6 +107,11 @@ def main():
     p.add_argument("--limit", type=int, default=None, help="first N assays (smoke)")
     p.add_argument("--out_dir", default="results/proteingym")
     p.add_argument("--tag", default="")
+    p.add_argument("--sq_alpha", type=float, default=0.5,
+                   help="SmoothQuant migration strength; 0 = no smoothing, "
+                        "1 = move all the range into the weights")
+    p.add_argument("--sq_calib", type=int, default=16,
+                   help="sequences used to observe activation ranges")
     args = p.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -138,8 +143,19 @@ def main():
         raise SystemExit(f"[skip] {args.config}: {why}")
 
     t_load = time.time()
-    model, tok, info = models.load(args.model, args.config, attn=args.attn,
+    # int8_dyn_sq carries no torchao_factory, so models.load returns it
+    # unquantized; SmoothQuant is applied here because it needs a calibration
+    # pass over real inputs. Calibrating on the assays being scored is the
+    # favourable case and is reported as such.
+    load_cfg = "bf16" if args.config == "int8_dyn_sq" else args.config
+    model, tok, info = models.load(args.model, load_cfg, attn=args.attn,
                                    device=device, compile_model=False)
+    if args.config == "int8_dyn_sq":
+        calib = [a["wt"] for a in todo[:args.sq_calib]]
+        print(f"[smoothquant] calibrating on {len(calib)} sequences, "
+              f"alpha={args.sq_alpha}")
+        quant.apply_smoothquant(model, tok, calib, device=device,
+                                alpha=args.sq_alpha, batch_size=args.dms_batch)
     t_load = time.time() - t_load
     print(f"[load] {t_load:.1f}s  weights {info['weight_bytes'] / 1024**3:.2f} GB")
 

@@ -1,0 +1,12 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:50<00:50, 50.99s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:00<00:00, 26.51s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:00<00:00, 30.18s/it]
+assay                                role         L              outlier ratio  kurtosis    absmax
+                                                      median      p95      max
+----------------------------------------------------------------------------------------------------
+UBR5_HUMAN_Tsuboyama_2023_1I2T       COLLAPSE    58     16.8    310.32921875200.0     568.0      14.8
+DNJA1_HUMAN_Tsuboyama_2023_2LO1      control     65     17.0    456.96187500032.0     478.0      17.5
+PR40A_HUMAN_Tsuboyama_2023_1UZC      control     63     15.5    298.43640625152.0     297.3      15.2
+SPTN1_CHICK_Tsuboyama_2023_1TUD      control     60     17.1    448.37281250304.0     557.0      14.9
+YAIA_ECOLI_Tsuboyama_2023_2KVT       control     52     17.2    320.24937500160.0     453.9      16.6
+
+[done] results/outliers_3B.json

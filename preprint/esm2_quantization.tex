@@ -53,9 +53,13 @@ of most practical consequence, \textbf{quantizing a large model is dominated by
 using a small one}: of eighteen scale/configuration combinations only three are
 Pareto-optimal over accuracy, memory and speed, and all three are 650M. INT4 at
 3B --- a natural choice for a small memory footprint --- uses more memory than
-650M in bf16 while being less accurate and $20\times$ slower. We also report
-four measurement artifacts encountered during this study, three of which
-inverted the result they were meant to measure.
+650M in bf16 while being less accurate and $20\times$ slower. We further show that the single
+catastrophic failure we observe --- INT8 dynamic quantization taking one assay
+from $\rho = 0.591$ to $0.223$ --- is a defect of default \emph{symmetric}
+activation scaling rather than of W8A8 itself: asymmetric activation
+quantization, a one-line change requiring no calibration, removes every damaged
+assay. We also report four measurement artifacts encountered during this study,
+three of which inverted the result they were meant to measure.
 \end{abstract}
 
 \noindent
@@ -1198,6 +1202,115 @@ MSA depth: high     & $-0.0042$ & $+0.0097$ & $+0.0033$ \\
 \end{tabular}
 \end{table}
 
+\subsubsection*{The W8A8 collapse is a scaling defect, not a limit of the scheme}
+\label{sec:w8a8fix}
+
+Reporting that \cfg{int8\_dyn} destroys an assay is not the same as establishing
+that W8A8 cannot work for ESM-2, and the two carry very different
+recommendations. We tested the difference.
+
+The obvious explanation --- too coarse a quantization granularity --- is
+unavailable: \cfg{int8\_dyn} already uses \emph{per-token} activation scales and
+\emph{per-channel} weight scales, so the standard refinement is the
+configuration already in use. What a per-token scale cannot absorb is a single
+channel that is large within a token, which is the activation-outlier regime
+SmoothQuant addresses by migrating outliers into the weights.
+
+We first looked for that signature directly, profiling per-channel activation
+magnitudes at every encoder Linear input on the collapsing assay and on four
+length-matched assays that do not collapse. \textbf{It is not there.} The
+collapsing assay's outlier ratio (median 16.8, p95 310) sits inside the control
+range (15.5--17.2, 298--457) and its largest raw activation, 14.8, is
+\emph{smaller} than every control (14.9--17.5). We report this negative result
+because it is evidence about the diagnostic as much as about the mechanism:
+aggregating over 180 Linear layers washes out a defect localised to a few, so
+model-wide activation statistics are not a usable screen.
+
+The intervention test is decisive where the diagnostic was not
+(Table~\ref{tab:w8a8}). Both remedies remove every damaged assay.
+
+\begin{table}[htb]
+\centering
+\caption{Repairing W8A8 at 3B over the full benchmark. \cfg{int8\_dyn\_asym} is
+the same configuration with asymmetric rather than symmetric activation
+quantization --- one keyword argument, no calibration. \cfg{int8\_dyn\_sq} adds
+SmoothQuant with $\alpha = 0.5$ calibrated on 16 target sequences. Both
+eliminate all six damaged assays and cut the worst case by an order of
+magnitude. The defect is therefore in the default activation scaling, not in
+W8A8.}
+\label{tab:w8a8}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Config & mean $\Delta$ & worst $\Delta$ & $|\Delta|>0.05$ & worst $\rho_{\text{fp32}}$ & pos/s & peak GB \\
+\midrule
+\cfg{int8\_dyn}       & $-0.0021$ & $\mathbf{-0.3688}$ & 6 & 0.393 & 17.0 & 3.51 \\
+\cfg{int8\_dyn\_asym} & $-0.0001$ & $-0.0395$ & \textbf{0} & 0.965 & \textbf{33.1} & 4.13 \\
+\cfg{int8\_dyn\_sq}   & $+0.0002$ & $\mathbf{-0.0237}$ & \textbf{0} & 0.737 & 16.9 & 3.66 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+On the two assays that collapse, \cfg{int8\_dyn}'s $-0.3688$ and $-0.1268$
+become $+0.0102$ and $-0.0164$ under asymmetric scaling and $+0.0034$ and
+$-0.0098$ under SmoothQuant, with fidelity against fp32 on the worst assay
+rising from $0.393$ to $0.999$.
+
+The practical ordering is not the one we expected. \textbf{Asymmetric activation
+quantization is the better remedy}: it needs no calibration data, no extra pass
+and no prototype dependency, and in our measurements it ran $1.95\times$ faster
+than symmetric \cfg{int8\_dyn} (20.6 against 40.0 minutes for the benchmark) at
+$0.6$\,GB more peak memory. We did not investigate the speed difference and do
+not claim it generalises. SmoothQuant achieves a slightly better worst case
+($-0.024$ against $-0.040$) but costs a calibration pass, and its worst-assay
+\emph{fidelity} is actually poorer ($0.737$ against $0.965$).
+
+This changes a recommendation. ``Avoid \cfg{int8\_dyn}'' was too general: the
+correct statement is that its default \emph{symmetric} activation scaling is
+unsafe on ESM-2 and that a one-line change repairs it. Symmetric scaling
+allocates half the INT8 range to values of a sign that post-GELU activations
+rarely take, which is a plausible account of why the asymmetric variant helps,
+though we have not isolated it.
+
+\subsubsection*{A label-free screen for which assays are at risk}
+\label{sec:snr}
+
+Chasing this mechanism produced something more useful than the mechanism. What
+determines whether a ranking survives a perturbation is not the size of the
+perturbation but its size \emph{relative to the spread of the scores being
+perturbed}. Both quantities are computable from the candidate and the fp32
+reference on a user's own target, with no experimental labels:
+\[
+\mathrm{SNR} \;=\; \mathrm{sd}\big(\sigma_{\text{fp32}}\big) \;\big/\;
+\mathrm{sd}\big(\sigma_{\text{cand}} - \sigma_{\text{fp32}}\big).
+\]
+
+\begin{table}[htb]
+\centering
+\caption{SNR against realised damage, over all 3015 assay/configuration/scale
+combinations. Every collapse beyond $0.10$ in this study has $\mathrm{SNR} <
+1.7$, and no combination with $\mathrm{SNR} > 8$ is damaged beyond $0.05$. It
+is therefore usable as an all-clear rather than as a precise predictor: a high
+SNR licenses deployment, a low one demands a closer look.}
+\label{tab:snr}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+SNR & $n$ & median $|\Delta|$ & $P(|\Delta| > 0.05)$ & worst $\Delta$ \\
+\midrule
+$< 2$   &   13 & 0.0478 & 46.2\% & $-0.3688$ \\
+$2$--$4$ &  139 & 0.0165 &  7.2\% & $-0.0569$ \\
+$4$--$8$ &  630 & 0.0092 &  1.4\% & $-0.0622$ \\
+$> 8$   & 2233 & 0.0019 &  \textbf{0.0\%} & $-0.0409$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This is a better screen than the raw drift test in Algorithm~\ref{alg:select},
+because it is calibrated: $\rho_{\text{fp32}}$ bounds how far an answer can move
+without saying whether that distance matters for the assay at hand, whereas SNR
+compares the movement to the signal it has to preserve. We would now run both.
+
 \subsubsection*{Quantization competes with using a smaller model, and loses}
 
 Every comparison so far is within a scale: a configuration against fp32 on the
@@ -1507,7 +1620,8 @@ Variant-effect scoring & memory     & 650M/\cfg{int8\_wo} (0.73\,GB) before any 
                        &            & \quad quantization of a larger model \\
 Variant-effect scoring & 3B/15B fixed & \cfg{bf16} up to 3B; \cfg{fp8\_dyn} at 15B \\
 Bulk embedding (H200)  & throughput & \cfg{fp8\_dyn} + \texttt{max-autotune-no-cudagraphs} \\
-Bulk embedding (A100)  & throughput & \cfg{int8\_wo}; \cfg{int8\_dyn} costs real accuracy \\
+Bulk embedding (A100)  & throughput & \cfg{int8\_dyn} with \emph{asymmetric} activations; \\
+                       &            & \quad the symmetric default is unsafe \\
 Minimum footprint      & memory     & 650M/\cfg{int4\_wo} (0.60\,GB), after checking \\
                        &            & \quad drift on \emph{your} target; worst $-0.06$ \\
 QLoRA fine-tuning base & memory     & \cfg{int4\_wo} at the scale being tuned \\
@@ -1680,10 +1794,14 @@ three would have saved a further thirteen and left a third.
   \item \textbf{Variant-effect scoring at 15B: \cfg{fp8\_dyn}.} It matches bf16
         speed ($0.97\times$) at half the peak memory ($14.6$ vs $28.6$\,GB) with
         no measurable accuracy cost. The recommendation inverts with scale.
-  \item \textbf{Avoid \cfg{int8\_dyn} and \cfg{int4\_wo} for variant-effect work
-        at any scale.} They are not trade-offs: both are slower than the best
-        option in this regime \emph{and} own the two worst tails we measured,
-        $-0.37$ and $-0.20$.
+  \item \textbf{\cfg{int8\_dyn} is repairable; \cfg{int4\_wo} is not, here.}
+        \cfg{int8\_dyn}'s $-0.37$ collapse is a defect of its default
+        \emph{symmetric} activation scaling: switching to asymmetric --- one
+        keyword, no calibration --- removes all six damaged assays and cuts the
+        worst case to $-0.04$, and SmoothQuant does the same at higher cost.
+        Neither configuration is fast enough to displace \cfg{bf16} for
+        variant-effect scoring, but the blanket advice to avoid W8A8 on ESM-2
+        would have been wrong.
 \end{itemize}
 
 \paragraph{What the evidence says about evidence.} Four findings generalise past

@@ -1,0 +1,21 @@
+=== node ghnode001 | model 3B | config fp32 | array task 0 ===
+NVIDIA H200, 143771 MiB, 550.54.14
+torch 2.6.0+cu124 | cc (9, 0)
+
+[setup] model=3B config=int8_dyn_sq device=cuda
+[setup] 5 assays within max_len=1022, 0 skipped as too long, 0 already done -> 5 to score
+[setup] out=results/pgym_sq/3B_int8_dyn_sq.jsonl.gz
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:16<00:16, 16.18s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:25<00:00, 12.17s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:25<00:00, 12.77s/it]
+[smoothquant] calibrating on 5 sequences, alpha=0.5
+/scratch/qsh226/envs/esmquant/lib/python3.11/site-packages/torchao/quantization/quant_api.py:550: UserWarning: Passing a generic Callable to `quantize_` is no longer recommended and will be deprecated at a later release. Please see https://github.com/pytorch/ao/issues/1690 for instructions on how to pass in workflow configuration instead.
+  warnings.warn(
+[load] 34.1s  weights 5.29 GB
+[1/5] UBR5_HUMAN_Tsuboyama_2023_1I2T                L=   58 n=   1453 pos=   58     2.6s peak= 2.83GB | eta 0 min
+[2/5] SPTN1_CHICK_Tsuboyama_2023_1TUD               L=   60 n=   3201 pos=   60     3.0s peak= 2.88GB | eta 0 min
+[3/5] PR40A_HUMAN_Tsuboyama_2023_1UZC               L=   63 n=   2033 pos=   63     2.9s peak= 2.88GB | eta 0 min
+[4/5] DNJA1_HUMAN_Tsuboyama_2023_2LO1               FAIL AssertionError: Can't update existing min_val - shape mismatch, self.min_val:torch.Size([2560]) != min_val:torch.Size([1, 2560])
+[5/5] FKBP3_HUMAN_Tsuboyama_2023_2KFV               L=   69 n=   1237 pos=   69     3.3s peak= 2.88GB | eta 0 min
+
+[done] int8_dyn_sq: 5 assays in 0.3 min -> results/pgym_sq/3B_int8_dyn_sq.jsonl.gz
+=== done: 3B/fp32 (job 5395776) ===

@@ -92,6 +92,14 @@ def _ao():
             "Int8DynamicActivationInt8WeightConfig",
             "int8_dynamic_activation_int8_weight",
         ),
+        # Same factory, asymmetric activation mapping. Bound as a lambda so the
+        # keyword survives the config-class/function rename above.
+        "int8_dyn_asym": lambda: pick(
+            "Int8DynamicActivationInt8WeightConfig",
+            "int8_dynamic_activation_int8_weight",
+        )(act_mapping_type=__import__(
+            "torchao.quantization.quant_primitives", fromlist=["MappingType"]
+        ).MappingType.ASYMMETRIC),
         "fp8_dyn": pick(
             "Float8DynamicActivationFloat8WeightConfig",
             "float8_dynamic_activation_float8_weight",
@@ -156,6 +164,31 @@ CONFIGS: dict[str, QuantConfig] = {
         "Real INT8 tensor-core GEMMs on A100/H200. This is the A100 speed config. "
         "If accuracy drops, the cause is ESM-2's activation outliers -- try SmoothQuant.",
     ),
+    # Two probes for WHY int8_dyn collapses on some assays. int8_dyn already
+    # uses per-token activation and per-channel weight scales, so the usual
+    # "quantize at finer granularity" fix is already applied and cannot be the
+    # explanation. What per-token scaling still cannot absorb is a single
+    # channel that is huge WITHIN a token, which is the activation-outlier
+    # regime SmoothQuant was built for.
+    "int8_dyn_asym": QuantConfig(
+        name="int8_dyn_asym",
+        dtype=torch.bfloat16,
+        torchao_factory=lambda: _ao()["int8_dyn_asym"](),
+        min_cc=(8, 0),
+        notes="int8_dyn with ASYMMETRIC activation quantization (zero-point). "
+        "Symmetric scaling wastes half the INT8 range on one-sided activations, "
+        "which post-GELU tensors are. One-line change, no calibration.",
+    ),
+    "int8_dyn_sq": QuantConfig(
+        name="int8_dyn_sq",
+        dtype=torch.bfloat16,
+        torchao_factory=None,   # needs calibration; applied by models.load
+        min_cc=(8, 0),
+        notes="int8_dyn preceded by SmoothQuant: a per-channel smoothing factor "
+        "migrates activation outliers into the weights, which are quantized "
+        "per-channel and can absorb them. Requires a calibration pass, so it is "
+        "applied separately rather than through torchao_factory.",
+    ),
     "fp8_dyn": QuantConfig(
         name="fp8_dyn",
         dtype=torch.bfloat16,
@@ -186,4 +219,69 @@ def apply_torchao(model: torch.nn.Module, cfg: QuantConfig) -> torch.nn.Module:
     )
     quantize_(model, cfg.torchao_factory(), filter_fn=encoder_linear_filter)
     print(f"[quant] {cfg.name}: applied torchao to {n_before} encoder Linears")
+    return model
+
+
+def apply_smoothquant(model, tok, calib_seqs, device="cuda", alpha=0.5,
+                      batch_size=8):
+    """SmoothQuant + int8 dynamic, applied to encoder Linears only.
+
+    Unlike every other config here this one is NOT data-free: a per-channel
+    smoothing factor s is chosen from observed activation ranges, the
+    activation is divided by s and the weight multiplied by it. The product is
+    unchanged, but the activation outliers move into the weights, which are
+    quantized per-channel and can absorb them.
+
+    Calibration uses masked copies of the target sequences themselves, i.e. the
+    exact input distribution that will be scored. That is the favourable case
+    for SmoothQuant; a general-purpose recipe calibrated on unrelated proteins
+    would be a different, harder experiment.
+
+    Note that insert_smooth_quant_observer_ has no filter argument and observes
+    every Linear including the LM head. Only encoder Linears are converted by
+    the quantize_ call below; the rest keep their observer wrapper, which
+    forwards to the original module and leaves their numerics untouched.
+    """
+    import torch
+    from torchao.prototype.smoothquant import (insert_smooth_quant_observer_,
+                                               smooth_quant)
+    from torchao.quantization import quantize_
+
+    insert_smooth_quant_observer_(model, alpha=alpha, quant_mode="dynamic")
+    with torch.no_grad():
+        for seq in calib_seqs:
+            enc = tok(seq, return_tensors="pt", add_special_tokens=True)
+            ids = enc["input_ids"][0].to(device)
+            attn = enc["attention_mask"][0].to(device)
+            n = min(batch_size, ids.numel() - 2)
+            X = ids.unsqueeze(0).repeat(n, 1)
+            for r in range(n):
+                X[r, r + 1] = tok.mask_token_id
+            model(input_ids=X, attention_mask=attn.unsqueeze(0).expand(n, -1))
+    quantize_(model, smooth_quant(), filter_fn=encoder_linear_filter)
+
+    # Any Linear the filter did NOT convert still carries its observer, whose
+    # forward keeps calling obs(input). That is wasted work on every token and
+    # it eventually raises "Can't update existing min_val" once ranges shift
+    # -- which killed one assay in the first smoke run. Unwrap them back to
+    # plain Linears carrying the same parameters.
+    import torch.nn as nn
+    from torchao.prototype.smoothquant import SmoothQuantObservedLinear
+
+    n_unwrapped = 0
+    for parent_name, parent in list(model.named_modules()):
+        for child_name, child in list(parent.named_children()):
+            if isinstance(child, SmoothQuantObservedLinear):
+                lin = nn.Linear(child.in_features, child.out_features,
+                                bias=child.bias is not None,
+                                device=child.weight.device,
+                                dtype=child.weight.dtype)
+                with torch.no_grad():
+                    lin.weight.copy_(child.weight)
+                    if child.bias is not None:
+                        lin.bias.copy_(child.bias)
+                setattr(parent, child_name, lin)
+                n_unwrapped += 1
+    if n_unwrapped:
+        print(f"[smoothquant] unwrapped {n_unwrapped} unconverted observed Linears")
     return model

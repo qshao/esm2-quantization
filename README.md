@@ -447,6 +447,40 @@ difference is significant (15B-650M = -0.0137, p = 0.14). 15B costs 5.4x the
 compute of 3B for the lowest mean of the three, and its worst-case `bf16` drift
 is also larger (-0.032 vs -0.007).
 
+### The int8_dyn collapse is fixable -- and it's a one-line fix
+
+`int8_dyn` already uses per-token activation + per-channel weight scales, so
+"quantize more finely" was never available. Profiling activations on the
+collapsing assay vs length-matched controls found **no outlier signature** (its
+largest raw activation is *smaller* than every control). But the intervention
+test is decisive -- 3B, full benchmark:
+
+| config | mean d | worst d | assays \|d\|>0.05 | worst rho_fp32 | pos/s |
+|---|---|---|---|---|---|
+| `int8_dyn` (symmetric) | -0.0021 | **-0.3688** | 6 | 0.393 | 17.0 |
+| **`int8_dyn_asym`** | -0.0001 | -0.0395 | **0** | 0.965 | **33.1** |
+| `int8_dyn_sq` (SmoothQuant) | +0.0002 | **-0.0237** | **0** | 0.737 | 16.9 |
+
+**Asymmetric activation quantization wins**: no calibration, one keyword
+argument, and 1.95x faster than symmetric in our runs. SmoothQuant matches it on
+ground truth but costs a calibration pass and has *worse* worst-case fidelity.
+
+So "avoid int8_dyn" was too general -- its **symmetric default** is the defect.
+
+### A label-free screen for at-risk targets
+
+SNR = sd(fp32 scores) / sd(quantized - fp32). No experimental labels needed.
+
+| SNR | n | median \|d\| | P(\|d\|>0.05) |
+|---|---|---|---|
+| < 2 | 13 | 0.048 | **46.2%** |
+| 2-4 | 139 | 0.017 | 7.2% |
+| 4-8 | 630 | 0.009 | 1.4% |
+| **> 8** | 2233 | 0.002 | **0.0%** |
+
+Every collapse beyond 0.10 has SNR < 1.7; nothing above SNR 8 is damaged. Use it
+as an all-clear, not a precise predictor.
+
 ### Quantization competes with using a smaller model -- and loses
 
 Every comparison above is *within* a scale. Across scales, only **3 of 18**
