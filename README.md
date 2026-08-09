@@ -139,6 +139,50 @@ sbatch -p H8V141_SAP112M2000_L --mem=200G slurm/run_matrix.sbatch 3B fp32,bf16,i
 
 `fp8_dyn` self-skips with a clear reason on A100 rather than failing the run.
 
+## Reproducing a quantized model
+
+**No quantized checkpoints are published, deliberately.** Every config here is a
+data-free, deterministic function of the public MIT-licensed ESM-2 weights --
+`quantize_` with no calibration set, no search, no randomness. A 2.66 GB
+`int8_wo` checkpoint would carry no information these ten lines don't, and
+torchao serialises as tensor subclasses whose layout changes between releases,
+so a checkpoint pins you to one torchao version. The recipe does not.
+
+```python
+import torch, sys
+from transformers import EsmForMaskedLM
+from torchao.quantization import quantize_, int8_weight_only
+sys.path.insert(0, "src")
+from quant import encoder_linear_filter        # encoder-block Linears ONLY
+
+model = EsmForMaskedLM.from_pretrained(
+    "facebook/esm2_t36_3B_UR50D", dtype=torch.bfloat16).cuda().eval()
+quantize_(model, int8_weight_only(), filter_fn=encoder_linear_filter)
+```
+
+Swap `int8_weight_only()` for `int4_weight_only()`,
+`int8_dynamic_activation_int8_weight()` or
+`float8_dynamic_activation_float8_weight()`; `src/quant.py` holds all six as a
+registry. Verified on 150M: 180 encoder Linears converted, `lm_head` untouched,
+real weight storage 296 -> 151 MB.
+
+**`filter_fn` is the part that matters.** The conventional route --
+`TorchAoConfig("int8_weight_only")` passed to `from_pretrained` -- quantizes
+*every* Linear including the LM head, and **will not reproduce these results**.
+The variant score is a difference of two near-equal log-probabilities, so noise
+in the LM head is amplified rather than averaged away. If you publish a
+checkpoint, set `modules_to_not_convert` to match `encoder_linear_filter` and
+confirm a known rho before releasing it.
+
+`int8_dyn` and `fp8_dyn` are not really checkpoints at all: they quantize
+activations at *runtime*, so the weights are only half of what they are.
+
+**Measurement gotcha.** `sum(p.numel() * p.element_size())` does not see this
+quantization -- a tensor subclass reports its *logical* dtype (bf16), not its
+packed int8 storage, so the naive sum returns the unquantized figure and looks
+like the quantization silently failed. Read `weight.tensor_impl.int_data`, or
+measure `torch.cuda.max_memory_allocated` as `src/bench.py` does.
+
 ## Results: ESM2-3B on H200 (SDPA, max-autotune-no-cudagraphs)
 
 Reproduced across three independent jobs; bf16 throughput varied 0.4%.
