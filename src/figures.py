@@ -92,11 +92,12 @@ def fig_fidelity(models):
         ax.margins(y=0.12)        # outliers must not sit on the spine
     # The single worst point in the study; a short steep leader keeps the
     # label off the point cloud without a long line across empty axes.
-    axes[1].annotate("int8_dyn, UBR5_HUMAN (3B)", (0.36, -0.369),
-                     textcoords="offset points", xytext=(-72, 26), fontsize=6,
-                     color="0.25", ha="left",
-                     arrowprops=dict(arrowstyle="-", lw=0.5, color="0.55",
-                                     shrinkA=1, shrinkB=2))
+    # No leader line: matplotlib anchors it to the text bounding box, which
+    # renders as an underline before the diagonal. Right-aligned just above the
+    # point is unambiguous and cleaner, since nothing else is nearby.
+    axes[1].annotate("int8_dyn, UBR5_HUMAN (3B)  ", (0.36, -0.369),
+                     textcoords="offset points", xytext=(0, 9), fontsize=6,
+                     color="0.25", ha="right")
     axes[0].set_ylabel(r"$|\Delta\rho|$ vs experiment")
     axes[0].set_title(r"magnitude: predictable ($r=0.74/0.81/0.56$)")
     axes[1].set_ylabel(r"$\Delta\rho$ vs experiment (signed)")
@@ -200,11 +201,13 @@ def fig_scale():
     # (c) the crossover: the safe configs degrade with scale while the most
     # aggressive one improves.
     ax = axes[2]
+    # bf16 and int8_wo nearly coincide here (0/0/13 and 0/0/15). Dashing bf16
+    # is not enough on its own -- CFGS puts it first, so int8_wo was drawn on
+    # top of it and it vanished. It needs the higher zorder too.
     for c in CFGS:
-        # bf16 and int8_wo nearly coincide here (0/0/13 and 0/0/15); a dashed
-        # bf16 stays visible instead of being painted over.
         ax.plot(x, [tail[m][c] for m in ms], marker="o", color=COL[c], lw=1.4,
-                ms=4, ls="--" if c == "bf16" else "-", label=LBL[c])
+                ms=4, ls="--" if c == "bf16" else "-", label=LBL[c],
+                zorder=5 if c == "bf16" else 3)
     ax.set_ylim(-14, 232)
     ax.set_xlim(-0.25, 2.25)
     ax.set_ylabel("assays with " + r"$\rho_{\mathrm{fp32}}<0.99$")
