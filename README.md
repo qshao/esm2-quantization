@@ -424,7 +424,24 @@ config shows a significant effect.
 right choice for *both* workloads, which it is not at either smaller scale.
 **The DMS recommendation inverts: `bf16` up to 3B, `fp8_dyn` at 15B.**
 
-**3. Scale does not buy accuracy.** fp32 mean rho falls monotonically
+**3. The safe configs degrade at 15B while the aggressive one improves.**
+Assays (of 201) where a config drifts from fp32 by rho < 0.99:
+
+| config | 650M | 3B | 15B | worst rho_fp32 at 15B |
+|---|---|---|---|---|
+| bf16 | 0 | 0 | **13** | 0.857 |
+| int8_wo | 0 | 0 | **15** | 0.855 |
+| fp8_dyn | 29 | 18 | 19 | 0.839 |
+| int8_dyn | 25 | 108 | 31 | 0.765 |
+| int4_wo | 182 | 154 | **82** | 0.851 |
+
+`bf16` and `int8_wo` are drift-free across all 402 assay/model pairs at 650M and
+3B, then pick up a tail at 15B; `int4_wo` sheds one. Medians stay above 0.99
+everywhere, so none of this shows in a summary statistic. The worst-affected
+assay is also **different for every (config, scale) pair** -- no assay appears
+twice -- so clearing a config at one scale does not clear it at another.
+
+**4. Scale does not buy accuracy.** fp32 mean rho falls monotonically
 0.4459 -> 0.4398 -> 0.4323 across a 23x parameter increase; no pairwise
 difference is significant (15B-650M = -0.0137, p = 0.14). 15B costs 5.4x the
 compute of 3B for the lowest mean of the three, and its worst-case `bf16` drift

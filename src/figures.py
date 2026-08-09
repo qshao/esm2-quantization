@@ -88,6 +88,15 @@ def fig_fidelity(models):
         leg = ax.legend(frameon=False, markerscale=2.2, loc="upper left")
         for h in leg.legend_handles:
             h.set_alpha(1)
+    for ax in axes:
+        ax.margins(y=0.12)        # outliers must not sit on the spine
+    # The single worst point in the study; a short steep leader keeps the
+    # label off the point cloud without a long line across empty axes.
+    axes[1].annotate("int8_dyn, UBR5_HUMAN (3B)", (0.36, -0.369),
+                     textcoords="offset points", xytext=(-72, 26), fontsize=6,
+                     color="0.25", ha="left",
+                     arrowprops=dict(arrowstyle="-", lw=0.5, color="0.55",
+                                     shrinkA=1, shrinkB=2))
     axes[0].set_ylabel(r"$|\Delta\rho|$ vs experiment")
     axes[0].set_title(r"magnitude: predictable ($r=0.74/0.81/0.56$)")
     axes[1].set_ylabel(r"$\Delta\rho$ vs experiment (signed)")
@@ -144,46 +153,70 @@ def fig_pareto():
 
 
 def fig_scale():
-    """The workload conflict is scale-dependent, and scale does not buy accuracy."""
+    """Three things that only a scale sweep shows."""
     ms = ["650M", "3B", "15B"]
     x = [0, 1, 2]
-    spd = {m: {r["config"]: r["pos_per_s"] for r in
-               json.load(open(os.path.join(ROOT, "results", "proteingym",
-                                           f"summary_{m}.json")))["speed_ram"]}
-           for m in ms}
-    rho = {}
+    spd, rho, tail = {}, {}, {}
     for m in ms:
+        j = json.load(open(os.path.join(ROOT, "results", "proteingym",
+                                        f"summary_{m}.json")))
+        spd[m] = {r["config"]: r["pos_per_s"] for r in j["speed_ram"]}
         t = pd.read_csv(os.path.join(ROOT, "results", "proteingym",
                                      f"summary_{m}_per_assay.csv"))
         rho[m] = t[t.config == "fp32"]["rho_expt"].mean()
+        tail[m] = {c: int((t[t.config == c]["rho_fp32"] < 0.99).sum())
+                   for c in CFGS}
 
-    fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.6))
+    fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.5))
+
+    # (a) speed relative to bf16. bf16 is a legend entry, not an inline label,
+    # so no text sits on the line it describes.
+    ax = axes[0]
+    ax.axhline(1.0, color=COL["bf16"], lw=1.2, ls="--", label="bf16 (baseline)")
     for c in ["fp8_dyn", "int8_wo", "int8_dyn", "int4_wo"]:
-        y = [spd[m][c] / spd[m]["bf16"] for m in ms]
-        axes[0].plot(x, y, "o-", color=COL[c], lw=1.4, ms=4, label=LBL[c])
-        axes[0].annotate(f"{y[-1]:.2f}x", (x[-1], y[-1]), textcoords="offset points",
-                         xytext=(5, -2), fontsize=6.5, color=COL[c])
-    axes[0].axhline(1.0, color=COL["bf16"], lw=1.2, ls="--")
-    # Placed right of centre: the legend occupies the upper-left corner.
-    axes[0].annotate("bf16 baseline", (0.42, 1.0), xycoords=("axes fraction", "data"),
-                     textcoords="offset points", xytext=(0, 4), fontsize=6.5,
-                     color=COL["bf16"], family="monospace")
-    axes[0].set_ylabel("DMS speed relative to bf16")
-    axes[0].set_title("quantization catches up with scale")
-    axes[0].legend(frameon=False, loc="upper left", ncol=2, columnspacing=1.0)
-    axes[0].set_ylim(0, 1.25)
+        ax.plot(x, [spd[m][c] / spd[m]["bf16"] for m in ms], "o-",
+                color=COL[c], lw=1.4, ms=4, label=LBL[c])
+    ax.set_ylim(0, 1.85)          # headroom so the legend clears the 1.0 line
+    ax.set_xlim(-0.25, 2.25)
+    ax.set_ylabel("DMS speed relative to bf16")
+    ax.set_title("(a) quantization catches up")
+    ax.legend(frameon=False, loc="upper left", ncol=2, columnspacing=0.7,
+              handlelength=1.3, borderpad=0.1, fontsize=6, labelspacing=0.3)
 
-    axes[1].plot(x, [rho[m] for m in ms], "o-", color="black", lw=1.4, ms=5)
+    # (b) accuracy vs scale. margins keep the value labels off the spines.
+    ax = axes[1]
+    ax.plot(x, [rho[m] for m in ms], "o-", color="black", lw=1.4, ms=5)
+    # Labels go up-and-right of each marker: the curve descends left to right,
+    # so that quadrant is the one it never occupies. Centred-above collides
+    # with the line for every point after the first.
     for i, m in enumerate(ms):
-        axes[1].annotate(f"{rho[m]:.4f}", (i, rho[m]), textcoords="offset points",
-                         xytext=(0, 7), fontsize=6.5, ha="center")
-    axes[1].set_ylabel(r"fp32 mean $\rho$ vs experiment")
-    axes[1].set_title("accuracy does not follow scale")
-    axes[1].set_ylim(0.428, 0.450)
+        ax.annotate(f"{rho[m]:.4f}", (i, rho[m]), textcoords="offset points",
+                    xytext=(7, 6), fontsize=6.5, ha="left")
+    ax.set_ylim(0.4280, 0.4530)
+    ax.set_xlim(-0.30, 2.75)
+    ax.set_ylabel(r"fp32 mean $\rho$ vs experiment")
+    ax.set_title("(b) accuracy does not follow")
+
+    # (c) the crossover: the safe configs degrade with scale while the most
+    # aggressive one improves.
+    ax = axes[2]
+    for c in CFGS:
+        # bf16 and int8_wo nearly coincide here (0/0/13 and 0/0/15); a dashed
+        # bf16 stays visible instead of being painted over.
+        ax.plot(x, [tail[m][c] for m in ms], marker="o", color=COL[c], lw=1.4,
+                ms=4, ls="--" if c == "bf16" else "-", label=LBL[c])
+    ax.set_ylim(-14, 232)
+    ax.set_xlim(-0.25, 2.25)
+    ax.set_ylabel("assays with " + r"$\rho_{\mathrm{fp32}}<0.99$")
+    ax.set_title("(c) fidelity crossover")
+    ax.legend(frameon=False, loc="upper right", fontsize=6, handlelength=1.4,
+              borderpad=0.1, labelspacing=0.25)
 
     for ax in axes:
-        ax.set_xticks(x); ax.set_xticklabels([f"ESM2-{m}" for m in ms])
-        ax.set_xlim(-0.25, 2.45); ax.set_xlabel("model scale")
+        ax.set_xticks(x)
+        ax.set_xticklabels(["650M", "3B", "15B"])
+        ax.set_xlabel("model scale")
+    fig.subplots_adjust(wspace=0.48)
     fig.savefig(os.path.join(OUT, "fig_scale.pdf"))
     plt.close(fig)
 

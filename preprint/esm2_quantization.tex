@@ -768,6 +768,108 @@ fixed property of a configuration either --- it belongs to \cfg{int4\_wo} at
 650M and to \cfg{int8\_dyn} at 3B. Knowing which configuration was dangerous at
 one scale does not tell you which will be dangerous at another.
 
+\subsubsection*{At 15B the safe configurations degrade and the aggressive one improves}
+
+Scale does not move all configurations in the same direction, and the crossover
+is visible only with a third point (Figure~\ref{fig:scale}c,
+Table~\ref{tab:fid3}). \cfg{bf16} and \cfg{int8\_wo} do not drift measurably
+from fp32 on \emph{any} of the 402 assay/model pairs at 650M and 3B, and then
+drift on 13 and 15 assays respectively at 15B, with worst-case rank correlation
+falling to $0.857$ and $0.855$. \cfg{int4\_wo} moves the other way: 182 assays
+below $\rho_{\text{fp32}} = 0.99$ at 650M, 154 at 3B, 82 at 15B.
+
+\begin{table}[htb]
+\centering
+\caption{Fidelity against fp32 by scale: number of assays with
+$\rho_{\text{fp32}} < 0.99$ (of 201), and the worst single-assay value. The two
+columns move in opposite directions with scale --- the configurations that are
+safe at small scale are the ones that acquire a tail at 15B, while the most
+aggressive one loses its tail. Medians stay above $0.99$ everywhere, so none of
+this is visible in a summary statistic.}
+\label{tab:fid3}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{3}{c}{assays with $\rho_{\text{fp32}}<0.99$} & \multicolumn{3}{c}{worst $\rho_{\text{fp32}}$} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Config & 650M & 3B & 15B & 650M & 3B & 15B \\
+\midrule
+\cfg{bf16}      &   0 &   0 & 13 & 0.9974 & 0.9905 & 0.8569 \\
+\cfg{int8\_wo}  &   0 &   0 & 15 & 0.9963 & 0.9968 & 0.8548 \\
+\cfg{fp8\_dyn}  &  29 &  18 & 19 & 0.9556 & 0.9770 & 0.8389 \\
+\cfg{int8\_dyn} &  25 & 108 & 31 & 0.8894 & 0.3930 & 0.7645 \\
+\cfg{int4\_wo}  & 182 & 154 & 82 & 0.6707 & 0.8791 & 0.8505 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A natural reading is that a larger model carries more redundancy, so removing
+weight precision costs proportionally less, while its activation dynamic range
+grows until bf16's exponent becomes the binding constraint. We do not have the
+evidence to assert that mechanism: it would need a per-layer error analysis and
+an fp16-versus-bf16 comparison, neither of which we ran. What the data supports
+is narrower and still consequential --- \textbf{the identity of the risky
+configuration is not stable across scale}, so a configuration cleared at one
+scale has not thereby been cleared at another.
+
+The 15B \cfg{bf16} degradation is not a long-sequence artifact. Spearman
+correlation between assay length and $\rho_{\text{fp32}}$ is $-0.14$, and the
+five worst assays span $L = 222$ to $861$.
+
+\begin{table}[htb]
+\centering
+\caption{The single worst-affected assay, by configuration and scale. No assay
+appears twice. Identifying the vulnerable target at one scale does not identify
+it at another, which is why the screen in Algorithm~\ref{alg:select} has to be
+run against the model actually being deployed.}
+\label{tab:worst3}
+\small
+\begin{tabular}{llrr}
+\toprule
+Scale & Config & Worst assay & $\Delta\rho$ \\
+\midrule
+650M & \cfg{bf16}      & \texttt{AICDA\_HUMAN\_Gajula\_2014\_3cycles} ($L{=}198$) & $-0.0040$ \\
+650M & \cfg{int8\_dyn} & \texttt{POLG\_PESV\_Tsuboyama\_2023\_2MXD} ($L{=}53$)    & $-0.0411$ \\
+650M & \cfg{int4\_wo}  & \texttt{B2L11\_HUMAN\_Dutta\_2010} ($L{=}198$)           & $-0.2024$ \\
+\addlinespace
+3B   & \cfg{bf16}      & \texttt{ODP2\_GEOSE\_Tsuboyama\_2023\_1W4G} ($L{=}44$)   & $-0.0072$ \\
+3B   & \cfg{int8\_dyn} & \texttt{UBR5\_HUMAN\_Tsuboyama\_2023\_1I2T} ($L{=}58$)   & $-0.3688$ \\
+3B   & \cfg{int4\_wo}  & \texttt{R1AB\_SARS2\_Flynn\_2022} ($L{=}306$)            & $-0.0556$ \\
+\addlinespace
+15B  & \cfg{bf16}      & \texttt{I6TAH8\_I68A0\_Doud\_2015} ($L{=}498$)           & $-0.0323$ \\
+15B  & \cfg{int8\_dyn} & \texttt{GFP\_AEQVI\_Sarkisyan\_2016} ($L{=}238$)         & $-0.1112$ \\
+15B  & \cfg{int4\_wo}  & \texttt{MBD11\_ARATH\_Tsuboyama\_2023\_6ACV} ($L{=}66$)  & $-0.0472$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{Resource envelope at 15B}
+
+\begin{table}[htb]
+\centering
+\caption{ESM2-15B footprint. Peak memory during masked-marginals scoring is
+almost entirely weights: the spread across 201 assays spanning $L = 37$ to $934$
+is under $3$\,GB for every configuration. Quantization therefore addresses
+essentially all of the DMS memory cost at this scale, and fp32 alone rules out
+an 80\,GB A100.}
+\label{tab:res15b}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Config & Weights (GB) & \multicolumn{3}{c}{Peak memory over 201 assays (GB)} \\
+\cmidrule(lr){3-5}
+       &              & min & median & max \\
+\midrule
+\cfg{fp32}      & 56.36 & 56.51 & 57.09 & 59.30 \\
+\cfg{bf16}      & 28.18 & 28.27 & 28.57 & 29.69 \\
+\cfg{int8\_wo}  & 14.14 & 14.39 & 14.53 & 15.64 \\
+\cfg{fp8\_dyn}  & 14.12 & 14.22 & 14.57 & 15.91 \\
+\cfg{int8\_dyn} & 14.12 & 14.51 & 14.90 & 16.06 \\
+\cfg{int4\_wo}  &  7.53 &  7.62 &  7.91 &  9.03 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsubsection*{The configuration ranking is scale-dependent}
 \label{sec:scaledep}
 
@@ -810,13 +912,17 @@ recommendation derived at 650M or 3B does not transfer upward
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{fig_scale.pdf}
-\caption{\emph{Left:} DMS scoring speed relative to bf16 against model scale.
-\cfg{fp8\_dyn} converges on bf16 while the weight-only and INT4 paths do not,
-so the ``quantization is pure overhead for DMS'' conclusion is scale-bounded.
-\emph{Right:} fp32 mean Spearman against experiment falls monotonically across
-a 23-fold parameter increase. No pairwise difference is significant, but there
-is no evidence that scale buys variant-effect accuracy, and 15B costs
-$5.4\times$ the compute of 3B for the lowest of the three.}
+\caption{Three effects visible only across scale. \textbf{(a)} DMS speed
+relative to bf16: \cfg{fp8\_dyn} converges on bf16 while the weight-only and
+INT4 paths do not, so ``quantization is pure overhead for DMS'' is
+scale-bounded. \textbf{(b)} fp32 mean Spearman against experiment falls
+monotonically across a 23-fold parameter increase; no pairwise difference is
+significant, but there is no evidence that scale buys variant-effect accuracy,
+and 15B costs $5.4\times$ the compute of 3B for the lowest of the three.
+\textbf{(c)} Number of assays where a configuration drifts from fp32
+($\rho_{\text{fp32}}<0.99$): \cfg{bf16} and \cfg{int8\_wo} acquire a tail only
+at 15B, while \cfg{int4\_wo} sheds one. The safe and the aggressive
+configurations move in opposite directions.}
 \label{fig:scale}
 \end{figure}
 
