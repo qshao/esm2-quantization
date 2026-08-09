@@ -47,15 +47,15 @@ takes a single assay from $\rho = 0.591$ to $0.223$. Selection must be made on
 worst-case, not mean, behaviour. Second, \textbf{fidelity measured against fp32
 bounds risk but cannot rank quality}: over 3015 assay/configuration pairs it
 predicts the \emph{magnitude} of ground-truth change ($r = 0.56$--$0.81$) but
-not its \emph{direction}, and INT4 weight-only quantization is significantly
-harmful at 650M, significantly \emph{beneficial} at 3B, and indistinguishable
-from fp32 at 15B --- a reversal with no monotone trend to extrapolate. Third,
-\textbf{the configuration ranking is itself scale-dependent}: FP8 dynamic
-quantization runs at $0.30\times$ bf16 speed for DMS at 650M and
-$0.97\times$ at 15B while halving memory, so the workload conflict that
-dominates at small scale dissolves at large scale. We also report four
-measurement artifacts encountered during this study, three of which inverted
-the result they were meant to measure.
+not its \emph{direction}: the INT4 effect differs significantly between 650M and
+3B ($+0.0101$, $p = 0.0007$) with no monotone trend to extrapolate. Third, and
+of most practical consequence, \textbf{quantizing a large model is dominated by
+using a small one}: of eighteen scale/configuration combinations only three are
+Pareto-optimal over accuracy, memory and speed, and all three are 650M. INT4 at
+3B --- a natural choice for a small memory footprint --- uses more memory than
+650M in bf16 while being less accurate and $20\times$ slower. We also report
+four measurement artifacts encountered during this study, three of which
+inverted the result they were meant to measure.
 \end{abstract}
 
 \noindent
@@ -716,6 +716,7 @@ Config & $\Delta$ & 95\% CI & $\Delta$ & 95\% CI & $\Delta$ & 95\% CI \\
 \end{table}
 
 \subsubsection*{The benchmark mean is the wrong safety criterion}
+\label{sec:tail}
 
 Every $\Delta$ in Table~\ref{tab:acc3} is below $0.007$. The per-assay tail is
 not (Figure~\ref{fig:tail}, Table~\ref{tab:tail3}).
@@ -767,6 +768,51 @@ Table~\ref{tab:tail3} adds a second warning. The catastrophic tail is not a
 fixed property of a configuration either --- it belongs to \cfg{int4\_wo} at
 650M and to \cfg{int8\_dyn} at 3B. Knowing which configuration was dangerous at
 one scale does not tell you which will be dangerous at another.
+
+\paragraph{Conditioning the tail on the reference having signal.} A large drop
+in rank correlation on an assay where fp32 itself scores near zero is rank
+instability, not damage: the configuration was useless on that target either
+way, and counting such cases inflates the tail. Restricting to the 156--157
+assays (of 201) where fp32 reaches $\rho > 0.3$ separates the two
+(Table~\ref{tab:tailcond}).
+
+\begin{table}[htb]
+\centering
+\caption{Worst single-assay $\Delta\rho$ unconditioned, and restricted to assays
+where the fp32 reference itself achieves $\rho > 0.3$. The 3B \cfg{int8\_dyn}
+collapse is unchanged by conditioning --- fp32 reaches $0.591$ on that assay ---
+while the 650M \cfg{int4\_wo} and 15B \cfg{int8\_dyn} figures shrink
+substantially, because they occur on assays where fp32 reaches only $0.270$ and
+$0.290$. Counts in parentheses are assays with $|\Delta\rho| > 0.05$ among those
+retained.}
+\label{tab:tailcond}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{3}{c}{worst $\Delta\rho$, all 201} & \multicolumn{3}{c}{worst $\Delta\rho$, $\rho_{\text{fp32}}>0.3$} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Config & 650M & 3B & 15B & 650M & 3B & 15B \\
+\midrule
+\cfg{bf16}      & $-0.004$ & $-0.007$ & $-0.032$ & $-0.004$ (0) & $-0.007$ (0) & $-0.022$ (0) \\
+\cfg{int8\_wo}  & $-0.012$ & $-0.011$ & $-0.033$ & $-0.012$ (0) & $-0.009$ (0) & $-0.018$ (0) \\
+\cfg{fp8\_dyn}  & $-0.032$ & $-0.034$ & $-0.046$ & $-0.025$ (0) & $-0.034$ (0) & $-0.025$ (0) \\
+\cfg{int8\_dyn} & $-0.041$ & $\mathbf{-0.369}$ & $-0.111$ & $-0.032$ (0) & $\mathbf{-0.369}$ (2) & $-0.030$ (0) \\
+\cfg{int4\_wo}  & $-0.202$ & $-0.056$ & $-0.047$ & $-0.050$ (4) & $-0.056$ (5) & $-0.047$ (2) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The threshold is a judgement call, and we report its sensitivity rather than let
+one cut carry the conclusion. The 3B \cfg{int8\_dyn} collapse is $-0.369$ at
+every cut from $0.0$ to $0.4$; the 650M \cfg{int4\_wo} figure is $-0.202$ up to
+a cut of $0.2$ and $-0.050$ beyond it. Our central example is therefore robust
+and the $-0.20$ figure is not, which is why the recommendation table now cites
+$-0.06$ rather than $-0.20$ as the drift a practitioner should plan for.
+
+Conditioning also sharpens the practical statement. On assays where the model is
+usable at all, \cfg{int8\_dyn} at 3B damages 2 of 157 and \cfg{int4\_wo} damages
+4--5 of 157 by more than $0.05$: roughly a 1--3\% chance that a given target is
+affected. That is the number to act on, and it is not visible in a mean.
 
 \subsubsection*{At 15B the safe configurations degrade and the aggressive one improves}
 
@@ -932,11 +978,48 @@ configurations move in opposite directions.}
 resolve into a trend.} Section~\ref{sec:gt} concluded that quantization does not
 systematically degrade variant-effect accuracy, on the evidence that 11 of 15
 shifts were upward and that \cfg{int4\_wo} gained $+0.0495$ on BLAT. At
-benchmark scale \cfg{int4\_wo} is significantly \emph{harmful} at 650M
-($-0.0064$), significantly \emph{beneficial} at 3B ($+0.0037$), and
-indistinguishable from fp32 at 15B. Two scales would have left this looking like
-a trend in model size; the third removes that reading. All three measurements
-are correct and there is nothing to extrapolate from them.
+benchmark scale \cfg{int4\_wo} moves $-0.0064$ at 650M, $+0.0037$ at 3B and
+$+0.0009$ at 15B.
+
+Stating this as ``significant in opposite directions'' would rest on two
+separate tests against fp32 whose verdicts are then compared by eye, and those
+tests are only nominally significant: Table~\ref{tab:acc3} reports 15
+comparisons (five configurations at three scales), against which a Bonferroni
+threshold is $0.0033$, and the two \cfg{int4\_wo} results give $p = 0.0102$ and
+$p = 0.0104$. Neither survives.
+
+The claim we actually want is that the effect \emph{differs} between scales,
+and that is one paired test on the same 201 assays rather than two tests and a
+comparison. It is also the stronger test (Table~\ref{tab:interaction}):
+
+\begin{table}[htb]
+\centering
+\caption{Interaction contrasts for \cfg{int4\_wo}: the change in effect between
+scales, from the same protein-clustered paired bootstrap at $R = 20{,}000$
+resamples. The 3B--650M contrast survives Bonferroni correction for all 15
+comparisons, where neither individual test does. No other configuration shows a
+significant interaction, and 15B does not differ significantly from 3B, so the
+dependence is not monotone in scale.}
+\label{tab:interaction}
+\small
+\begin{tabular}{lrlr}
+\toprule
+Contrast & Difference & 95\% CI & $p$ \\
+\midrule
+3B $-$ 650M  & $+0.0101$ & $[+0.0046,+0.0155]$ & $\mathbf{0.0007}$ \\
+15B $-$ 650M & $+0.0073$ & $[+0.0021,+0.0123]$ & $0.0067$ \\
+15B $-$ 3B   & $-0.0028$ & $[-0.0062,+0.0006]$ & $0.1017$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+So the scale dependence of \cfg{int4\_wo} is established, while the sign of its
+effect at any single scale is not: the difference between scales is larger and
+better resolved than either endpoint. That is the more useful statement anyway,
+since it is the one that tells a practitioner a result measured at one scale
+does not transfer. All bootstrap results in this paper use $R = 20{,}000$;
+$R = 2000$ floors the two-sided $p$ at $0.001$, which is too coarse to
+distinguish these cases.
 
 \textbf{Fidelity predicts magnitude, not direction.} Across 3015
 assay/configuration pairs, $r(1-\rho_{\text{fp32}},|\Delta|)$ is $0.74$, $0.81$
@@ -997,6 +1080,75 @@ MSA depth: high     & $-0.0042$ & $+0.0097$ & $+0.0033$ \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsubsection*{Quantization competes with using a smaller model, and loses}
+
+Every comparison so far is within a scale: a configuration against fp32 on the
+same checkpoint. That is the wrong frame for a practitioner, who is not obliged
+to run 3B at all. Once the three scales are placed on one Pareto surface over
+(accuracy, peak memory, speed), \textbf{only three of the eighteen
+configurations are non-dominated, and all three are 650M}
+(Figure~\ref{fig:dominance}, Table~\ref{tab:pareto}).
+
+\begin{table}[htb]
+\centering
+\caption{Cross-scale Pareto surface. An option is dominated if another is at
+least as good on accuracy, peak memory \emph{and} speed, and strictly better on
+one. Every 3B and 15B configuration is dominated by a 650M one --- including
+3B/\cfg{int4\_wo}, the configuration our own recommendations table previously
+offered for minimum memory, which uses \emph{more} memory than 650M/\cfg{bf16}
+while being less accurate and $20\times$ slower.}
+\label{tab:pareto}
+\small
+\begin{tabular}{llrrrl}
+\toprule
+Scale & Config & mean $\rho$ & peak GB & pos/s & Status \\
+\midrule
+650M & \cfg{bf16}      & 0.4460 &  1.33 & 347.7 & \textbf{frontier} \\
+650M & \cfg{int8\_wo}  & 0.4457 &  0.73 & 249.0 & \textbf{frontier} \\
+650M & \cfg{int4\_wo}  & 0.4395 &  0.60 &  55.4 & \textbf{frontier} \\
+\addlinespace
+650M & \cfg{fp32}      & 0.4459 &  2.70 &  95.0 & dominated by 650M/\cfg{bf16} \\
+650M & \cfg{fp8\_dyn}  & 0.4452 &  0.75 & 103.3 & dominated by 650M/\cfg{int8\_wo} \\
+650M & \cfg{int8\_dyn} & 0.4440 &  0.75 &  23.8 & dominated by 650M/\cfg{int8\_wo} \\
+3B   & \cfg{int4\_wo}  & 0.4435 &  1.82 &  17.3 & dominated by 650M/\cfg{bf16} \\
+3B   & \cfg{bf16}      & 0.4399 &  5.50 & 200.6 & dominated by 650M/\cfg{bf16} \\
+3B   & \cfg{int8\_wo}  & 0.4399 &  2.87 & 139.3 & dominated by 650M/\cfg{bf16} \\
+3B   & \cfg{fp32}      & 0.4398 & 11.10 &  25.6 & dominated by 650M/\cfg{fp32} \\
+15B  & \cfg{int4\_wo}  & 0.4332 &  7.91 &   3.9 & dominated by 650M/\cfg{fp32} \\
+15B  & \cfg{fp8\_dyn}  & 0.4325 & 14.57 &  54.9 & dominated by 650M/\cfg{fp32} \\
+15B  & \cfg{bf16}      & 0.4323 & 28.57 &  56.7 & dominated by 650M/\cfg{fp32} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_dominance.pdf}
+\caption{All eighteen scale/configuration combinations on two projections of the
+Pareto surface; upper-left is better in both panels. Circled points are
+non-dominated, and all are ESM2-650M. The practical consequence is that
+aggressive quantization of a large model is not a way to buy a small memory
+footprint for this workload --- a small model already provides one, more
+accurately and far faster.}
+\label{fig:dominance}
+\end{figure}
+
+We take this to be the most consequential practical result in the paper, and it
+is invisible to a within-scale comparison. Quantization remains useful
+\emph{within} the frontier model: 650M/\cfg{int8\_wo} halves the memory of
+650M/\cfg{bf16} for a $0.0002$ accuracy change, and 650M/\cfg{int4\_wo} halves
+it again. But the memory-oriented configurations at 3B and 15B are not
+trade-offs against a small model; they are strictly worse than one.
+
+Two qualifications. First, this holds for variant-effect scoring, where 650M is
+statistically indistinguishable from 3B and 15B on ground truth
+(Section~\ref{sec:full}); it does not transfer to tasks where the larger
+checkpoints are genuinely better, and structure prediction is the obvious such
+task. Second, dominance is stated on \emph{benchmark-mean} accuracy, and
+Section~\ref{sec:tail} argues that means are the wrong selection criterion --- a
+practitioner with a specific target should check the tail rather than read the
+frontier off this table.
 
 \subsubsection*{Speed and memory over the whole benchmark}
 
@@ -1230,17 +1382,19 @@ $0.018$ across 402 assay/model pairs), \cfg{fp8\_dyn} is nearly so ($0.034$), an
 \small
 \begin{tabular}{lll}
 \toprule
-Workload & Scale & Recommendation \\
+Workload & Constraint & Recommendation \\
 \midrule
-Bulk embedding extraction & any (H200)  & \cfg{fp8\_dyn} + \texttt{max-autotune-no-cudagraphs} \\
-Bulk embedding extraction & any (A100)  & \cfg{int8\_wo}; \cfg{int8\_dyn} costs real accuracy \\
-DMS / variant effect      & $\leq$ 3B   & \cfg{bf16}, eager, no compile \\
-DMS / variant effect      & 15B         & \cfg{fp8\_dyn} --- matches bf16 speed at half the memory \\
-DMS under memory pressure & $\leq$ 3B   & \cfg{int8\_wo} ($\sim$70\% of bf16 speed) \\
-Minimum memory footprint  & any         & \cfg{int4\_wo}, only after confirming drift \\
-                          &             & \quad on \emph{your} target; worst observed $-0.20$ \\
-QLoRA fine-tuning base    & any         & \cfg{int4\_wo} \\
-V100 / sm\_70 hardware    & any         & Quantization buys memory only, never speed \\
+Variant-effect scoring & accuracy   & \cfg{bf16} at \textbf{650M} --- 3B and 15B are \\
+                       &            & \quad not better and cost more \\
+Variant-effect scoring & memory     & 650M/\cfg{int8\_wo} (0.73\,GB) before any \\
+                       &            & \quad quantization of a larger model \\
+Variant-effect scoring & 3B/15B fixed & \cfg{bf16} up to 3B; \cfg{fp8\_dyn} at 15B \\
+Bulk embedding (H200)  & throughput & \cfg{fp8\_dyn} + \texttt{max-autotune-no-cudagraphs} \\
+Bulk embedding (A100)  & throughput & \cfg{int8\_wo}; \cfg{int8\_dyn} costs real accuracy \\
+Minimum footprint      & memory     & 650M/\cfg{int4\_wo} (0.60\,GB), after checking \\
+                       &            & \quad drift on \emph{your} target; worst $-0.06$ \\
+QLoRA fine-tuning base & memory     & \cfg{int4\_wo} at the scale being tuned \\
+V100 / sm\_70          & any        & Quantization buys memory only, never speed \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1337,10 +1491,24 @@ three would have saved a further thirteen and left a third.
         since a truncation window is a scoring-protocol change that would
         confound the comparison. Configuration behaviour above $L = 934$ is
         therefore unmeasured.
-  \item \textbf{Multiple comparisons are uncorrected.} Five configurations are
-        tested against fp32 per model. Both significant results survive a
-        Bonferroni threshold of $0.05/5 = 0.01$, but \cfg{int4\_wo} at 650M sits
-        exactly on it ($p = 0.010$).
+  \item \textbf{Only two results survive multiple-comparison correction.}
+        Fifteen comparisons against fp32 are reported (five configurations at
+        three scales), against a Bonferroni threshold of $0.0033$. Only
+        \cfg{int8\_dyn} at 650M ($p = 0.0003$) and the 3B--650M interaction
+        contrast for \cfg{int4\_wo} ($p = 0.0007$) clear it. The individual
+        \cfg{int4\_wo} effects at 650M and 3B are nominal only
+        ($p = 0.0102$, $0.0104$), and we state them as such rather than as
+        established effects.
+  \item \textbf{Dominance is stated on benchmark means.} The Pareto surface in
+        Table~\ref{tab:pareto} uses mean $\rho$, the statistic this paper
+        otherwise argues against selecting on. It is the right basis for a
+        general recommendation and the wrong one for a specific target; a
+        practitioner should run the per-target screen regardless of what the
+        frontier says.
+  \item \textbf{The signal threshold is arbitrary.} Conditioning the tail on
+        $\rho_{\text{fp32}} > 0.3$ is a judgement call. We report the
+        sensitivity across cuts from $0.0$ to $0.4$; the 3B \cfg{int8\_dyn}
+        result is invariant, the 650M \cfg{int4\_wo} result is not.
   \item \textbf{Bootstrap resolution.} At 2000 resamples the smallest reportable
         two-sided $p$ is $0.001$; values at that floor should be read as
         $p < 0.002$ rather than as point estimates.
@@ -1363,9 +1531,14 @@ three would have saved a further thirteen and left a third.
 
 \section{Conclusions}
 
-\paragraph{What to run.} Two workloads, and the answer depends on model scale.
+\paragraph{What to run.} Choose the model scale first.
 
 \begin{itemize}\setlength{\itemsep}{2pt}
+  \item \textbf{For variant-effect scoring, use ESM2-650M.} It is
+        statistically indistinguishable from 3B and 15B on ground truth, and
+        every non-dominated point on the accuracy/memory/speed surface is a
+        650M configuration. Quantizing a larger model to save memory is
+        strictly worse than not using the larger model.
   \item \textbf{Bulk embedding extraction: \cfg{fp8\_dyn} with
         \texttt{max-autotune}.} Best on all three axes at once at 3B ---
         $1.15\times$ bf16 throughput, peak memory $12.63 \to 7.24$\,GB, accuracy
@@ -1406,9 +1579,10 @@ ESM-2, and each contradicts a common practice.
         labels required (Algorithm~\ref{alg:select}).
   \item \textbf{Conclusions are bounded by model scale, not only by sample
         size.} The workload conflict that motivates half this paper holds at
-        650M and 3B and dissolves at 15B. The \cfg{int4\_wo} effect is
-        significantly negative, significantly positive, and null at the three
-        scales in ascending order --- not a trend, so nothing to extrapolate.
+        650M and 3B and dissolves at 15B. The \cfg{int4\_wo} effect differs
+        significantly between 650M and 3B ($p = 0.0007$) without being monotone
+        in scale, so it is established that a one-scale result does not
+        transfer, and not established what the effect is at any single scale.
         Even the stratification by MSA depth replicates at two scales and breaks
         at the third. A result measured at one scale should be reported as a
         result at that scale.

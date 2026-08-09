@@ -447,6 +447,31 @@ difference is significant (15B-650M = -0.0137, p = 0.14). 15B costs 5.4x the
 compute of 3B for the lowest mean of the three, and its worst-case `bf16` drift
 is also larger (-0.032 vs -0.007).
 
+### Quantization competes with using a smaller model -- and loses
+
+Every comparison above is *within* a scale. Across scales, only **3 of 18**
+configurations are Pareto-optimal on (accuracy, memory, speed), and **all three
+are 650M**:
+
+| option | mean rho | peak GB | pos/s | |
+|---|---|---|---|---|
+| **650M bf16** | 0.4460 | 1.33 | 347.7 | frontier |
+| **650M int8_wo** | 0.4457 | **0.73** | 249.0 | frontier |
+| **650M int4_wo** | 0.4395 | **0.60** | 55.4 | frontier |
+| 3B int4_wo | 0.4435 | 1.82 | 17.3 | dominated by 650M bf16 |
+| 3B bf16 | 0.4399 | 5.50 | 200.6 | dominated by 650M bf16 |
+| 15B int4_wo | 0.4332 | 7.91 | 3.9 | dominated by 650M fp32 |
+
+`3B int4_wo` -- the obvious pick for a small footprint -- uses **more** memory
+than `650M bf16`, is less accurate, and is 20x slower. Quantization is still
+worth it *within* 650M (`int8_wo` halves memory for a 0.0002 accuracy change),
+but quantizing a big model to save memory is strictly worse than not using the
+big model. For variant-effect scoring only; this does not transfer to tasks
+where the larger checkpoints are genuinely better.
+
+Run `python src/analyze_scales.py` to reproduce, along with the interaction
+tests and the signal-conditioned tail.
+
 ### Model choice does NOT dominate precision choice
 
 An earlier 3-assay reading -- 650M beating 3B by 0.14 Spearman on BLAT -- suggested

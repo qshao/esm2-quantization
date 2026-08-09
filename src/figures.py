@@ -224,6 +224,50 @@ def fig_scale():
     plt.close(fig)
 
 
+def fig_dominance():
+    """Quantization competes with using a smaller model, not only with fp32."""
+    P = pd.DataFrame(json.load(open(os.path.join(
+        ROOT, "results", "proteingym", "cross_scale.json")))["pareto"])
+    MK = {"650M": "o", "3B": "s", "15B": "^"}
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.8))
+    for ax, xcol, xl, logx in [(axes[0], "gb", "peak memory (GB)", True),
+                               (axes[1], "pos_s", "masked positions/s", True)]:
+        for _, r in P.iterrows():
+            front = r.dominated_by is None
+            ax.scatter(r[xcol], r.rho, s=54 if front else 26,
+                       marker=MK[r.scale], color=COL[r.config],
+                       edgecolors="black" if front else "none",
+                       linewidths=0.9 if front else 0, zorder=4 if front else 3,
+                       alpha=1.0 if front else 0.55)
+        # Config name only: the caption and footer both say every frontier
+        # point is 650M, and the "650M/" prefix made the two top labels
+        # overlap. Offsets separate bf16 from int8_wo, which differ by 0.0003
+        # in rho and would otherwise print on top of each other.
+        off = {"bf16": (7, 5), "int8_wo": (7, -11), "int4_wo": (7, -3)}
+        for _, r in P[P.dominated_by.isna()].iterrows():
+            ax.annotate(LBL[r.config], (r[xcol], r.rho),
+                        textcoords="offset points",
+                        xytext=off.get(r.config, (7, -3)), fontsize=6.5,
+                        family="monospace", color=COL[r.config])
+        if logx:
+            ax.set_xscale("log")
+        ax.set_xlabel(xl)
+        ax.set_ylabel(r"mean $\rho$ vs experiment")
+        ax.margins(x=0.34, y=0.14)
+    # Scale legend, drawn in neutral grey so it reads as shape not colour.
+    h = [plt.Line2D([], [], ls="", marker=MK[m], color="0.35", ms=5,
+                    label=f"ESM2-{m}") for m in ("650M", "3B", "15B")]
+    h.append(plt.Line2D([], [], ls="", marker="o", mfc="none", mec="black",
+                        ms=7, label="Pareto frontier"))
+    axes[0].legend(handles=h, frameon=False, loc="lower left", fontsize=6,
+                   handletextpad=0.4, labelspacing=0.3)
+    fig.text(0.5, -0.06, "Upper-left is better in both panels. Every frontier "
+             "point is ESM2-650M.", ha="center", fontsize=7, color="0.3")
+    fig.subplots_adjust(wspace=0.32)
+    fig.savefig(os.path.join(OUT, "fig_dominance.pdf"))
+    plt.close(fig)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     models = {m: load(m) for m in ("650M", "3B", "15B")}
@@ -231,7 +275,9 @@ def main():
     fig_fidelity(models)
     fig_pareto()
     fig_scale()
-    for f in ("fig_tail.pdf", "fig_fidelity.pdf", "fig_pareto.pdf", "fig_scale.pdf"):
+    fig_dominance()
+    for f in ("fig_tail.pdf", "fig_fidelity.pdf", "fig_pareto.pdf",
+              "fig_scale.pdf", "fig_dominance.pdf"):
         p = os.path.join(OUT, f)
         print(f"  {f:20s} {os.path.getsize(p) / 1024:6.1f} KB")
 

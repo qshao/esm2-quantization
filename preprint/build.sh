@@ -24,6 +24,6 @@ grep "Output written" "$DOC.log"
 # arXiv wants the SOURCE, not the PDF: a tarball of .tex plus figures. It runs
 # its own pdflatex, so .aux/.log/.out must be excluded, but .bbl would be needed
 # if this used BibTeX -- it does not, the bibliography is inline in the .tex.
-tar --format=ustar -czf arxiv-submission.tar.gz "$DOC.tex" fig_tail.pdf fig_fidelity.pdf fig_pareto.pdf fig_scale.pdf
+tar --format=ustar -czf arxiv-submission.tar.gz "$DOC.tex" fig_tail.pdf fig_fidelity.pdf fig_pareto.pdf fig_scale.pdf fig_dominance.pdf
 echo "arxiv tarball: $(ls -lh arxiv-submission.tar.gz | awk '{print $5}')"
 tar -tzf arxiv-submission.tar.gz | sed 's/^/   /'

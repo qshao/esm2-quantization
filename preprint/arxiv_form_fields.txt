@@ -52,7 +52,7 @@ the result they were meant to measure.
 ================================================================================
 COMMENTS FIELD (optional but recommended)
 ================================================================================
-24 pages, 4 figures, 3 algorithms, 20 tables. Code and per-variant
+27 pages, 5 figures, 3 algorithms, 23 tables. Code and per-variant
 predictions for all 201 ProteinGym assays available at
 https://github.com/qshao/esm2-quantization
 
