@@ -1,0 +1,130 @@
+##### EAGER #####
+##### EAGER #####
+`torch_dtype` is deprecated! Use `dtype` instead!
+`torch_dtype` is deprecated! Use `dtype` instead!
+[setup] device=cuda model=650M attn=sdpa
+[setup] 128 sequences -> 4 bucketed batches, padding waste 0.3% (naive fixed-size would be 25.2%)
+
+=== bf16 ===
+  weights 1.213 GB | peak 2.803 GB | 29678.8 res/s
+
+=== int8_wo ===
+[quant] int8_wo: applied torchao to 198 encoder Linears
+  weights 0.612 GB | peak 3.428 GB | 23839.6 res/s
+
+=== int8_dyn ===
+[quant] int8_dyn: applied torchao to 198 encoder Linears
+  weights 0.609 GB | peak 2.825 GB | 10422.2 res/s
+
+=== int4_wo ===
+[quant] int4_wo: applied torchao to 198 encoder Linears
+  weights 0.48 GB | peak 2.693 GB | 3918.7 res/s
+
+[done] wrote results/a100_eager.json
+
+==============================================================================
+config        wGB  peakGB      res/s  speedup    embcos   DMSrho
+------------------------------------------------------------------------------
+bf16         1.21    2.80    29678.8    1.00x       nan      nan
+int8_wo      0.61    3.43    23839.6    0.80x       nan      nan
+int8_dyn     0.61    2.83    10422.2    0.35x       nan      nan
+int4_wo      0.48    2.69     3918.7    0.13x       nan      nan
+==============================================================================
+[setup] device=cuda model=650M attn=sdpa
+[setup] 128 sequences -> 4 bucketed batches, padding waste 0.3% (naive fixed-size would be 25.2%)
+
+=== bf16 ===
+  weights 1.213 GB | peak 2.803 GB | 29657.7 res/s
+
+=== int8_wo ===
+[quant] int8_wo: applied torchao to 198 encoder Linears
+  weights 0.612 GB | peak 3.428 GB | 23830.9 res/s
+
+=== int8_dyn ===
+[quant] int8_dyn: applied torchao to 198 encoder Linears
+  weights 0.609 GB | peak 2.825 GB | 10400.8 res/s
+
+=== int4_wo ===
+[quant] int4_wo: applied torchao to 198 encoder Linears
+  weights 0.48 GB | peak 2.693 GB | 3919.9 res/s
+
+[done] wrote results/a100_eager.json
+
+==============================================================================
+config        wGB  peakGB      res/s  speedup    embcos   DMSrho
+------------------------------------------------------------------------------
+bf16         1.21    2.80    29657.7    1.00x       nan      nan
+int8_wo      0.61    3.43    23830.9    0.80x       nan      nan
+int8_dyn     0.61    2.83    10400.8    0.35x       nan      nan
+int4_wo      0.48    2.69     3919.9    0.13x       nan      nan
+==============================================================================
+##### COMPILED #####
+##### COMPILED #####
+`torch_dtype` is deprecated! Use `dtype` instead!
+`torch_dtype` is deprecated! Use `dtype` instead!
+W0806 19:34:31.367000 26726 site-packages/torch/_dynamo/convert_frame.py:906] [0/8] torch._dynamo hit config.cache_size_limit (8)
+W0806 19:34:31.367000 26726 site-packages/torch/_dynamo/convert_frame.py:906] [0/8]    function: 'wrapper' (/scratch/qsh226/envs/esmquant/lib/python3.11/site-packages/transformers/utils/generic.py:912)
+W0806 19:34:31.367000 26726 site-packages/torch/_dynamo/convert_frame.py:906] [0/8]    last reason: 0/0: GLOBAL_STATE changed: allow_tf32 
+W0806 19:34:31.367000 26726 site-packages/torch/_dynamo/convert_frame.py:906] [0/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+W0806 19:34:31.367000 26726 site-packages/torch/_dynamo/convert_frame.py:906] [0/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+W0806 19:34:31.422000 26725 site-packages/torch/_dynamo/convert_frame.py:906] [0/8] torch._dynamo hit config.cache_size_limit (8)
+W0806 19:34:31.422000 26725 site-packages/torch/_dynamo/convert_frame.py:906] [0/8]    function: 'wrapper' (/scratch/qsh226/envs/esmquant/lib/python3.11/site-packages/transformers/utils/generic.py:912)
+W0806 19:34:31.422000 26725 site-packages/torch/_dynamo/convert_frame.py:906] [0/8]    last reason: 0/0: GLOBAL_STATE changed: allow_tf32 
+W0806 19:34:31.422000 26725 site-packages/torch/_dynamo/convert_frame.py:906] [0/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+W0806 19:34:31.422000 26725 site-packages/torch/_dynamo/convert_frame.py:906] [0/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+[setup] device=cuda model=650M attn=sdpa
+[setup] 128 sequences -> 4 bucketed batches, padding waste 0.3% (naive fixed-size would be 25.2%)
+
+=== bf16 ===
+  weights 1.213 GB | peak 2.111 GB | 47174.6 res/s
+
+=== int8_wo ===
+[quant] int8_wo: applied torchao to 198 encoder Linears
+  weights 0.612 GB | peak 1.521 GB | 43619.1 res/s
+
+=== int8_dyn ===
+[quant] int8_dyn: applied torchao to 198 encoder Linears
+  weights 0.609 GB | peak 2.825 GB | 10441.9 res/s
+
+=== int4_wo ===
+[quant] int4_wo: applied torchao to 198 encoder Linears
+  weights 0.475 GB | peak 2.687 GB | 3913.3 res/s
+
+[done] wrote results/a100_compiled.json
+
+==============================================================================
+config        wGB  peakGB      res/s  speedup    embcos   DMSrho
+------------------------------------------------------------------------------
+bf16         1.21    2.11    47174.6    1.00x       nan      nan
+int8_wo      0.61    1.52    43619.1    0.92x       nan      nan
+int8_dyn     0.61    2.83    10441.9    0.22x       nan      nan
+int4_wo      0.47    2.69     3913.3    0.08x       nan      nan
+==============================================================================
+[setup] device=cuda model=650M attn=sdpa
+[setup] 128 sequences -> 4 bucketed batches, padding waste 0.3% (naive fixed-size would be 25.2%)
+
+=== bf16 ===
+  weights 1.213 GB | peak 2.111 GB | 43842.5 res/s
+
+=== int8_wo ===
+[quant] int8_wo: applied torchao to 198 encoder Linears
+  weights 0.612 GB | peak 1.521 GB | 43607.2 res/s
+
+=== int8_dyn ===
+[quant] int8_dyn: applied torchao to 198 encoder Linears
+  weights 0.609 GB | peak 2.825 GB | 10436.6 res/s
+
+=== int4_wo ===
+[quant] int4_wo: applied torchao to 198 encoder Linears
+  weights 0.475 GB | peak 2.687 GB | 3913.1 res/s
+
+[done] wrote results/a100_compiled.json
+
+==============================================================================
+config        wGB  peakGB      res/s  speedup    embcos   DMSrho
+------------------------------------------------------------------------------
+bf16         1.21    2.11    43842.5    1.00x       nan      nan
+int8_wo      0.61    1.52    43607.2    0.99x       nan      nan
+int8_dyn     0.61    2.83    10436.6    0.24x       nan      nan
+int4_wo      0.47    2.69     3913.1    0.09x       nan      nan
+==============================================================================

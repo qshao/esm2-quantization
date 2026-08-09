@@ -1,0 +1,34 @@
+{
+  "args": {
+    "model": "650M",
+    "configs": "fp32,bf16",
+    "attn": "sdpa",
+    "compile": false,
+    "fasta": null,
+    "n_seqs": 8,
+    "lengths": "200,300",
+    "max_len": null,
+    "token_budget": 16384,
+    "fidelity_n": 4,
+    "skip_dms": false,
+    "dms_csv": null,
+    "dms_wt": null,
+    "dms_variant_col": "mutant",
+    "dms_score_col": "DMS_score",
+    "dms_len": 12,
+    "n_variants": 40,
+    "dms_batch": 16,
+    "out": "results/smoke.json"
+  },
+  "device": "cuda",
+  "results": [
+    {
+      "quant": "fp32",
+      "error": "ValueError: EsmForMaskedLM does not support an attention implementation through torch.nn.functional.scaled_dot_product_attention yet. Please request the support for this architecture: https://github.com/huggingface/transformers/issues/28005. If you believe this error is a bug, please open an issue in Transformers GitHub repository and load your model with the argument `attn_implementation=\"eager\"` meanwhile. Example: `model = AutoModel.from_pretrained(\"openai/whisper-tiny\", attn_implementation=\"eager\")`"
+    },
+    {
+      "quant": "bf16",
+      "error": "ValueError: EsmForMaskedLM does not support an attention implementation through torch.nn.functional.scaled_dot_product_attention yet. Please request the support for this architecture: https://github.com/huggingface/transformers/issues/28005. If you believe this error is a bug, please open an issue in Transformers GitHub repository and load your model with the argument `attn_implementation=\"eager\"` meanwhile. Example: `model = AutoModel.from_pretrained(\"openai/whisper-tiny\", attn_implementation=\"eager\")`"
+    }
+  ]
+}

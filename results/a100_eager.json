@@ -1,0 +1,114 @@
+{
+  "args": {
+    "model": "650M",
+    "configs": "bf16,int8_wo,int8_dyn,int4_wo",
+    "attn": "sdpa",
+    "compile": false,
+    "fasta": null,
+    "n_seqs": 128,
+    "lengths": "512,768,1024",
+    "max_len": null,
+    "token_budget": 32768,
+    "fidelity_n": 4,
+    "skip_dms": true,
+    "dms_csv": null,
+    "dms_wt": null,
+    "dms_variant_col": "mutant",
+    "dms_score_col": "DMS_score",
+    "dms_len": 40,
+    "n_variants": 200,
+    "dms_batch": 16,
+    "out": "results/a100_eager.json"
+  },
+  "device": "cuda",
+  "results": [
+    {
+      "model": "650M",
+      "model_id": "facebook/esm2_t33_650M_UR50D",
+      "quant": "bf16",
+      "attn": "sdpa",
+      "compiled": false,
+      "dtype": "torch.bfloat16",
+      "load_seconds": 10.1,
+      "weight_bytes": 1302113280,
+      "notes": "Practical baseline on A100/H200. Preferred over fp16 -- ESM-2 has known overflow/NaN issues in fp16 attention on some sequences.",
+      "weight_gb": 1.213,
+      "fidelity": "no fp32 reference in this run",
+      "throughput": {
+        "seconds": 9.918,
+        "n_sequences": 384,
+        "residues_per_s": 29657.7,
+        "padded_tokens_per_s": 29812.5,
+        "padding_overhead": 0.0052,
+        "peak_mem_gb": 2.803
+      },
+      "total_seconds": 38.9
+    },
+    {
+      "model": "650M",
+      "model_id": "facebook/esm2_t33_650M_UR50D",
+      "quant": "int8_wo",
+      "attn": "sdpa",
+      "compiled": false,
+      "dtype": "torch.bfloat16",
+      "load_seconds": 0.8,
+      "weight_bytes": 657108480,
+      "notes": "Weight-only INT8. Halves weight memory. Dequantizes to bf16 before the GEMM, so it does NOT speed up compute-bound encoder inference.",
+      "weight_gb": 0.612,
+      "fidelity": "no fp32 reference in this run",
+      "throughput": {
+        "seconds": 12.343,
+        "n_sequences": 384,
+        "residues_per_s": 23830.9,
+        "padded_tokens_per_s": 23955.3,
+        "padding_overhead": 0.0052,
+        "peak_mem_gb": 3.428
+      },
+      "total_seconds": 21.6
+    },
+    {
+      "model": "650M",
+      "model_id": "facebook/esm2_t33_650M_UR50D",
+      "quant": "int8_dyn",
+      "attn": "sdpa",
+      "compiled": false,
+      "dtype": "torch.bfloat16",
+      "load_seconds": 0.8,
+      "weight_bytes": 654067200,
+      "notes": "W8A8 INT8, per-channel weight + dynamic per-token activation scales. Real INT8 tensor-core GEMMs on A100/H200. This is the A100 speed config. If accuracy drops, the cause is ESM-2's activation outliers -- try SmoothQuant.",
+      "weight_gb": 0.609,
+      "fidelity": "no fp32 reference in this run",
+      "throughput": {
+        "seconds": 28.281,
+        "n_sequences": 384,
+        "residues_per_s": 10400.8,
+        "padded_tokens_per_s": 10455.1,
+        "padding_overhead": 0.0052,
+        "peak_mem_gb": 2.825
+      },
+      "total_seconds": 48.7
+    },
+    {
+      "model": "650M",
+      "model_id": "facebook/esm2_t33_650M_UR50D",
+      "quant": "int4_wo",
+      "attn": "sdpa",
+      "compiled": false,
+      "dtype": "torch.bfloat16",
+      "load_seconds": 0.8,
+      "weight_bytes": 515886080,
+      "notes": "torchao weight-only INT4 (tinygemm). ~4x weight memory reduction; the QLoRA base and the 'fit on a smaller GPU' config. Expect a THROUGHPUT REGRESSION at inference -- this is for the fine-tuning memory wall, not for speed. Requires bf16 compute dtype.",
+      "weight_gb": 0.48,
+      "fidelity": "no fp32 reference in this run",
+      "throughput": {
+        "seconds": 75.039,
+        "n_sequences": 384,
+        "residues_per_s": 3919.9,
+        "padded_tokens_per_s": 3940.4,
+        "padding_overhead": 0.0052,
+        "peak_mem_gb": 2.693
+      },
+      "total_seconds": 126.9
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+=== node: ganode001 ===
+NVIDIA A100 80GB PCIe, 81920 MiB, 550.54.14
+torch 2.6.0+cu124 | cc (8, 0)
+
+
+############################################################
+### ASSAY: IF1_ECOLI_Kelsic_2016
+############################################################
+[setup] device=cuda model=650M attn=sdpa
+[setup] 4 sequences -> 1 bucketed batches, padding waste 50.0% (naive fixed-size would be 50.0%)
+[setup] DMS: 1367 variants over 72 masked positions (WT length 72)
+
+=== fp32 ===
+`torch_dtype` is deprecated! Use `dtype` instead!
+  weights 2.49 GB | peak ? GB | ? res/s
+
+=== bf16 ===
+  weights 1.213 GB | peak ? GB | ? res/s
+  emb cos 0.999995 | logit KL 1.674e-05
+  DMS spearman vs fp32 0.9998 | max drift 0.317
+
+=== int8_wo ===
+[quant] int8_wo: applied torchao to 198 encoder Linears
+  weights 0.613 GB | peak ? GB | ? res/s
+  emb cos 0.999957 | logit KL 8.176e-05
+  DMS spearman vs fp32 0.9997 | max drift 0.438
+
+=== int8_dyn ===
+[quant] int8_dyn: applied torchao to 198 encoder Linears
+  weights 0.609 GB | peak ? GB | ? res/s
+  emb cos 0.999870 | logit KL 2.500e-04
+  DMS spearman vs fp32 0.9954 | max drift 2.396
+
+[done] wrote results/dms_650M_IF1_ECOLI_Kelsic_2016_5394316.json
+
+==============================================================================
+DMS workload: accuracy / speed / RAM
+config        wGB  peakGB     var/s     sec  rho_fp32  rho_expt
+------------------------------------------------------------------------------
+fp32         2.49    2.56    2244.7    0.61     (ref)    0.5987
+bf16         1.21    1.25    5863.7    0.23    0.9998    0.5996
+int8_wo      0.61    0.65    3814.8    0.36    0.9997    0.5985
+int8_dyn     0.61    0.65     460.9    2.97    0.9954    0.5924
+==============================================================================
+
+############################################################
+### ASSAY: BLAT_ECOLX_Stiffler_2015
+############################################################
+[setup] device=cuda model=650M attn=sdpa
+[setup] 4 sequences -> 1 bucketed batches, padding waste 50.0% (naive fixed-size would be 50.0%)
+[setup] DMS: 4996 variants over 263 masked positions (WT length 286)
+
+=== fp32 ===
+`torch_dtype` is deprecated! Use `dtype` instead!
+  weights 2.49 GB | peak ? GB | ? res/s
+
+=== bf16 ===
+  weights 1.213 GB | peak ? GB | ? res/s
+  emb cos 0.999995 | logit KL 1.674e-05
+  DMS spearman vs fp32 0.9998 | max drift 0.342
+
+=== int8_wo ===
+[quant] int8_wo: applied torchao to 198 encoder Linears
+  weights 0.613 GB | peak ? GB | ? res/s
+  emb cos 0.999957 | logit KL 8.176e-05
+  DMS spearman vs fp32 0.9997 | max drift 0.790
+
+=== int8_dyn ===
+[quant] int8_dyn: applied torchao to 198 encoder Linears
+  weights 0.609 GB | peak ? GB | ? res/s
+  emb cos 0.999870 | logit KL 2.500e-04
+  DMS spearman vs fp32 0.9969 | max drift 1.581
+
+[done] wrote results/dms_650M_BLAT_ECOLX_Stiffler_2015_5394316.json
+
+==============================================================================
+DMS workload: accuracy / speed / RAM
+config        wGB  peakGB     var/s     sec  rho_fp32  rho_expt
+------------------------------------------------------------------------------
+fp32         2.49    2.73     702.4    7.11     (ref)    0.7315
+bf16         1.21    1.34    4229.7    1.18    0.9998    0.7311
+int8_wo      0.61    0.74    3177.1    1.57    0.9997    0.7320
+int8_dyn     0.61    0.73     440.1   11.35    0.9969    0.7338
+==============================================================================
+
+############################################################
+### ASSAY: HSP82_YEAST_Flynn_2019
+############################################################
+[setup] device=cuda model=650M attn=sdpa
+[setup] 4 sequences -> 1 bucketed batches, padding waste 50.0% (naive fixed-size would be 50.0%)
+[setup] DMS: 13194 variants over 707 masked positions (WT length 709)
+
+=== fp32 ===
+`torch_dtype` is deprecated! Use `dtype` instead!
+  weights 2.49 GB | peak ? GB | ? res/s
+
+=== bf16 ===
+  weights 1.213 GB | peak ? GB | ? res/s
+  emb cos 0.999995 | logit KL 1.674e-05
+  DMS spearman vs fp32 0.9998 | max drift 0.651
+
+=== int8_wo ===
+[quant] int8_wo: applied torchao to 198 encoder Linears
+  weights 0.613 GB | peak ? GB | ? res/s
+  emb cos 0.999957 | logit KL 8.176e-05
+  DMS spearman vs fp32 0.9995 | max drift 1.081
+
+=== int8_dyn ===
+[quant] int8_dyn: applied torchao to 198 encoder Linears
+  weights 0.609 GB | peak ? GB | ? res/s
+  emb cos 0.999870 | logit KL 2.500e-04
+  DMS spearman vs fp32 0.9948 | max drift 2.364
+
+[done] wrote results/dms_650M_HSP82_YEAST_Flynn_2019_5394316.json
+
+==============================================================================
+DMS workload: accuracy / speed / RAM
+config        wGB  peakGB     var/s     sec  rho_fp32  rho_expt
+------------------------------------------------------------------------------
+fp32         2.49    3.06     277.5   47.55     (ref)    0.2648
+bf16         1.21    1.51    1540.8    8.56    0.9998    0.2648
+int8_wo      0.61    0.91    1254.3   10.52    0.9995    0.2637
+int8_dyn     0.61    0.90     332.7   39.66    0.9948    0.2611
+==============================================================================
+
+=== all assays done: job 5394316 ===

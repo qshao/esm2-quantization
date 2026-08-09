@@ -1,0 +1,16 @@
+=== node ghnode002 | model 3B | config fp32 | array task 0 ===
+NVIDIA H200, 143771 MiB, 550.54.14
+torch 2.6.0+cu124 | cc (9, 0)
+
+[setup] model=3B config=fp32 device=cuda
+[setup] 3 assays within max_len=1022, 0 skipped as too long, 0 already done -> 3 to score
+[setup] out=results/pgym_smoke/3B_fp32.jsonl.gz
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:18<00:18, 18.97s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:21<00:00,  9.38s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:21<00:00, 10.84s/it]
+[load] 330.5s  weights 10.72 GB
+[1/3] TCRG1_MOUSE_Tsuboyama_2023_1E0L               L=   37 n=   1058 pos=   35     0.3s peak=10.81GB | eta 0 min
+[2/3] BLAT_ECOLX_Stiffler_2015                      L=  286 n=   4996 pos=  263    11.2s peak=11.19GB | eta 0 min
+[3/3] MSH2_HUMAN_Jia_2020                           L=  934 n=  16749 pos=  934   119.2s peak=12.20GB | eta 0 min
+
+[done] fp32: 3 assays in 2.2 min -> results/pgym_smoke/3B_fp32.jsonl.gz
+=== done: 3B/fp32 (job 5395031) ===

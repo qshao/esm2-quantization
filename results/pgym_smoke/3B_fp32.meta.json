@@ -1,0 +1,15 @@
+{
+  "model": "3B",
+  "config": "fp32",
+  "device": "cuda",
+  "attn": "sdpa",
+  "weight_gb": 10.718,
+  "load_seconds": 330.5,
+  "max_len": 1022,
+  "dms_batch": 8,
+  "n_assays": 3,
+  "skipped_too_long": [],
+  "slurm_jobs": [
+    "5395031"
+  ]
+}

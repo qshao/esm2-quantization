@@ -1,0 +1,63 @@
+Paste-ready values for the arXiv submission form.
+The abstract field accepts only a limited LaTeX subset, so all math has been
+flattened to plain text. Everything below matches the compiled PDF.
+
+================================================================================
+TITLE
+================================================================================
+Benchmark Averages Hide the Failures That Matter: Quantizing ESM-2 for Protein
+Variant-Effect Prediction
+
+================================================================================
+AUTHORS
+================================================================================
+Qing Shao
+
+Affiliation: Department of Chemical and Materials Engineering, University of
+Kentucky, Lexington, KY 40506
+
+================================================================================
+CATEGORIES
+================================================================================
+Primary:    q-bio.QM  (Quantitative Methods)
+Cross-list: cs.LG     (Machine Learning)
+
+================================================================================
+ABSTRACT  (plain text, no LaTeX)
+================================================================================
+We benchmark six numerical precision configurations for ESM-2 protein language
+models across three axes -- throughput, memory footprint, and predictive
+accuracy -- on two workloads with sharply different characteristics: bulk
+embedding extraction and deep mutational scanning (DMS) variant-effect scoring.
+For ESM2-3B on an H200, FP8 dynamic quantization delivers 1.15x the throughput
+of bf16 while halving peak memory (12.63 -> 7.24 GB), making it the best
+configuration for embedding extraction. The same configuration is a poor choice
+for DMS scoring, where bf16 in eager mode is fastest at every problem size and
+quantization is pure overhead. Accuracy is evaluated on the complete ProteinGym
+substitution benchmark -- 201 assays, 2.41M variants, both model scales -- with
+a paired bootstrap clustered on protein. Two findings follow. First, fidelity
+measured against fp32, the metric such studies normally report, predicts the
+magnitude of the change in real-world accuracy (r = 0.81 over 1005
+assay/configuration pairs) but not its sign: INT4 weight-only quantization is
+significantly beneficial at 3B and significantly harmful at 650M. Second, and of
+more practical consequence, no configuration shifts mean benchmark correlation
+by more than 0.007, yet INT8 dynamic quantization -- indistinguishable from fp32
+on that mean (p = 0.34) -- takes a single assay from rho = 0.591 to 0.223.
+Benchmark averages conceal precisely the failure that determines whether a
+configuration is deployable. We conclude that drift-from-fp32 metrics are sound
+risk bounds but unsound quality rankings, that configuration selection should be
+made on worst-case rather than mean behaviour, and we report four measurement
+artifacts encountered during this study, three of which inverted the result they
+were meant to measure.
+
+================================================================================
+COMMENTS FIELD (optional but recommended)
+================================================================================
+18 pages, 3 figures, 10 tables. Code and per-variant predictions for all 201
+ProteinGym assays available at [INSERT URL/DOI].
+
+================================================================================
+LICENSE
+================================================================================
+Recommended: CC BY 4.0, if you want the figures and tables reusable.
+arXiv's default perpetual non-exclusive license is the most restrictive option.

@@ -1,0 +1,17 @@
+=== node ghnode002 | model 3B | config fp8_dyn | array task 4 ===
+NVIDIA H200, 143771 MiB, 550.54.14
+torch 2.6.0+cu124 | cc (9, 0)
+
+[setup] model=3B config=fp8_dyn device=cuda
+[setup] 3 assays within max_len=1022, 0 skipped as too long, 0 already done -> 3 to score
+[setup] out=results/pgym_smoke/3B_fp8_dyn.jsonl.gz
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [04:15<04:15, 255.84s/it]Loading checkpoint shards: 100%|██████████| 2/2 [04:46<00:00, 123.60s/it]Loading checkpoint shards: 100%|██████████| 2/2 [04:46<00:00, 143.44s/it]
+[quant] fp8_dyn: applied torchao to 216 encoder Linears
+[load] 332.4s  weights 2.65 GB
+[1/3] TCRG1_MOUSE_Tsuboyama_2023_1E0L               L=   37 n=   1058 pos=   35     0.4s peak= 2.72GB | eta 0 min
+[2/3] BLAT_ECOLX_Stiffler_2015                      L=  286 n=   4996 pos=  263     2.8s peak= 2.96GB | eta 0 min
+[3/3] MSH2_HUMAN_Jia_2020                           L=  934 n=  16749 pos=  934    20.7s peak= 3.56GB | eta 0 min
+
+[done] fp8_dyn: 3 assays in 0.4 min -> results/pgym_smoke/3B_fp8_dyn.jsonl.gz
+=== done: 3B/fp8_dyn (job 5395035) ===

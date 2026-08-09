@@ -1,0 +1,126 @@
+=== node: ghnode002 ===
+NVIDIA H200, 143771 MiB, 550.54.14
+torch 2.6.0+cu124 | cc (9, 0)
+
+[setup] device=cuda model=3B attn=sdpa
+[setup] 64 sequences -> 3 bucketed batches, padding waste 0.0% (naive fixed-size would be 25.0%)
+[setup] DMS: 200 variants over 11 masked positions (WT length 40)
+
+=== fp32 ===
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:18<00:18, 18.40s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:20<00:00,  9.03s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:20<00:00, 10.44s/it]
+/scratch/qsh226/envs/esmquant/lib/python3.11/site-packages/torch/_inductor/compile_fx.py:194: UserWarning: TensorFloat32 tensor cores for float32 matrix multiplication available but not enabled. Consider setting `torch.set_float32_matmul_precision('high')` for better performance.
+  warnings.warn(
+W0806 23:55:33.737000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 262144, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+W0806 23:55:41.415000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 294912, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+W0806 23:55:54.063000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 262144, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+AUTOTUNE mm(20480x2560, 2560x10240)
+  mm 20.2475 ms 100.0% 
+  triton_mm_92 40.1153 ms 50.5% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_87 44.2262 ms 45.8% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=64, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_85 47.5780 ms 42.6% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_89 48.2752 ms 41.9% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_91 50.8011 ms 39.9% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=8
+  triton_mm_90 74.6057 ms 27.1% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+  triton_mm_86 74.6085 ms 27.1% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+  triton_mm_82 74.7896 ms 27.1% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=4
+  triton_mm_81 80.0113 ms 25.3% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=4
+SingleProcess AUTOTUNE benchmarking takes 33.9890 seconds and 0.0002 seconds precompiling for 20 choices
+W0806 23:56:03.191000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 262144, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+AUTOTUNE mm(20480x2560, 2560x33)
+  mm 0.1611 ms 100.0% 
+  triton_mm_4139 0.4722 ms 34.1% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=64, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_4136 0.5072 ms 31.8% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_4134 0.5859 ms 27.5% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=64, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_4132 0.5908 ms 27.3% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_4129 0.6182 ms 26.1% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=4
+  triton_mm_4135 0.6405 ms 25.2% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=128, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=4
+  triton_mm_4128 0.7015 ms 23.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=4
+  triton_mm_4137 0.7791 ms 20.7% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+  triton_mm_4140 0.7920 ms 20.3% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=64, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=5, num_warps=8
+SingleProcess AUTOTUNE benchmarking takes 15.0657 seconds and 0.0001 seconds precompiling for 19 choices
+W0806 23:56:21.655000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 262144, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+W0806 23:56:29.067000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 294912, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+W0806 23:56:39.794000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 262144, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+AUTOTUNE mm(20480x2560, 2560x2560)
+  mm 5.3646 ms 100.0% 
+  triton_mm_16 10.5124 ms 51.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_11 11.2633 ms 47.6% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=64, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_9 12.1819 ms 44.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_13 12.3545 ms 43.4% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_15 13.0976 ms 41.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=8
+  triton_mm_6 18.7233 ms 28.7% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=4
+  triton_mm_10 18.8495 ms 28.5% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+  triton_mm_14 18.8509 ms 28.5% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+  triton_mm_5 20.0422 ms 26.8% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=4
+SingleProcess AUTOTUNE benchmarking takes 26.3561 seconds and 0.0002 seconds precompiling for 20 choices
+W0806 23:56:48.116000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 262144, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+W0806 23:56:55.311000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 294912, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+W0806 23:57:06.682000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 262144, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+AUTOTUNE addmm(20480x2560, 20480x2560, 2560x2560)
+  bias_addmm 5.3658 ms 100.0% 
+  addmm 5.5510 ms 96.7% 
+  triton_mm_35 10.5042 ms 51.1% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_30 11.3597 ms 47.2% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=64, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_28 12.1847 ms 44.0% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_32 12.3575 ms 43.4% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_34 13.1067 ms 40.9% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=8
+  triton_mm_25 18.7301 ms 28.6% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=4
+  triton_mm_33 18.8583 ms 28.5% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+  triton_mm_29 18.8598 ms 28.5% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+SingleProcess AUTOTUNE benchmarking takes 26.8861 seconds and 0.0001 seconds precompiling for 21 choices
+W0806 23:57:20.481000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 262144, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+W0806 23:57:28.429000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 294912, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+W0806 23:57:41.955000 83916 site-packages/torch/_inductor/select_algorithm.py:1696] [0/0] out of resource: shared memory, Required: 262144, Hardware limit: 232448. Reducing block sizes or `num_stages` may help.
+AUTOTUNE mm(20480x10240, 10240x2560)
+  mm 21.2155 ms 100.0% 
+  triton_mm_111 41.8860 ms 50.7% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_106 44.7878 ms 47.4% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=64, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_104 48.5870 ms 43.7% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_108 49.2347 ms 43.1% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_110 52.1099 ms 40.7% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=8
+  triton_mm_101 74.7739 ms 28.4% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=4
+  triton_mm_109 75.2436 ms 28.2% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+  triton_mm_105 75.2477 ms 28.2% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+  triton_mm_100 80.0530 ms 26.5% ACC_TYPE='tl.float32', ALLOW_TF32=False, BLOCK_K=16, BLOCK_M=64, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=2, num_warps=4
+SingleProcess AUTOTUNE benchmarking takes 35.2670 seconds and 0.0001 seconds precompiling for 20 choices
+  weights 10.718 GB | peak 25.369 GB | 6750.1 res/s
+
+=== bf16 ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:27<00:27, 27.81s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:31<00:00, 13.62s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:31<00:00, 15.75s/it]
+  weights 5.288 GB | peak 12.635 GB | 57056.5 res/s
+  emb cos 0.999949 | logit KL 1.172e-04
+  DMS spearman vs fp32 0.9998 | max drift 0.035
+
+=== int8_wo ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.75s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  2.81s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.25s/it]
+[quant] int8_wo: applied torchao to 216 encoder Linears
+  weights 2.659 GB | peak 8.481 GB | 54816.4 res/s
+  emb cos 0.999959 | logit KL 1.046e-04
+  DMS spearman vs fp32 0.9998 | max drift 0.082
+
+=== int8_dyn ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:44<00:44, 44.81s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:51<00:00, 22.20s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:51<00:00, 25.59s/it]
+[quant] int8_dyn: applied torchao to 216 encoder Linears
+  weights 2.653 GB | peak 7.065 GB | 59996.4 res/s
+  emb cos 0.989592 | logit KL 1.403e-02
+  DMS spearman vs fp32 0.9928 | max drift 0.227
+
+=== fp8_dyn ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:51<00:51, 51.32s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:58<00:00, 25.18s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:58<00:00, 29.10s/it]
+[quant] fp8_dyn: applied torchao to 216 encoder Linears
+  weights 2.653 GB | peak 7.241 GB | 65376.3 res/s
+  emb cos 0.999920 | logit KL 4.598e-04
+  DMS spearman vs fp32 0.9988 | max drift 0.154
+
+[done] wrote results/matrix_3B_5393554.json
+
+==============================================================================
+config        wGB  peakGB      res/s  speedup    embcos   DMSrho
+------------------------------------------------------------------------------
+fp32        10.72   25.37     6750.1    0.12x       nan      nan
+bf16         5.29   12.63    57056.5    1.00x  0.999949   0.9998
+int8_wo      2.66    8.48    54816.4    0.96x  0.999959   0.9998
+int8_dyn     2.65    7.07    59996.4    1.05x  0.989592   0.9928
+fp8_dyn      2.65    7.24    65376.3    1.15x  0.999920   0.9988
+==============================================================================

@@ -1,0 +1,46 @@
+=== node: ganode001 ===
+NVIDIA A100 80GB PCIe, 81920 MiB, 550.54.14
+torch 2.6.0+cu124 | cc (8, 0)
+
+
+############################################################
+### ASSAY: IF1_ECOLI_Kelsic_2016
+############################################################
+[setup] device=cuda model=650M attn=sdpa
+[setup] 4 sequences -> 1 bucketed batches, padding waste 50.0% (naive fixed-size would be 50.0%)
+[setup] DMS: 1367 variants over 72 masked positions (WT length 72)
+
+=== fp32 ===
+`torch_dtype` is deprecated! Use `dtype` instead!
+  weights 2.49 GB | peak ? GB | ? res/s
+
+=== bf16 ===
+  weights 1.213 GB | peak ? GB | ? res/s
+  emb cos 0.999995 | logit KL 1.674e-05
+  DMS spearman vs fp32 0.9998 | max drift 0.317
+
+=== int8_wo ===
+[quant] int8_wo: applied torchao to 198 encoder Linears
+  weights 0.613 GB | peak ? GB | ? res/s
+  emb cos 0.999957 | logit KL 8.176e-05
+  DMS spearman vs fp32 0.9997 | max drift 0.438
+
+=== int8_dyn ===
+[quant] int8_dyn: applied torchao to 198 encoder Linears
+  weights 0.609 GB | peak ? GB | ? res/s
+  emb cos 0.999870 | logit KL 2.500e-04
+  DMS spearman vs fp32 0.9954 | max drift 2.396
+
+[done] wrote results/dms_650M_IF1_ECOLI_Kelsic_2016_5394147.json
+
+==============================================================================
+DMS workload: accuracy / speed / RAM
+config        wGB  peakGB     var/s     sec  rho_fp32  rho_expt
+------------------------------------------------------------------------------
+fp32         2.49    2.56    2236.0    0.61     (ref)    0.5987
+bf16         1.21    1.25    5605.9    0.24    0.9998    0.5996
+int8_wo      0.61    0.65    3745.1    0.36    0.9997    0.5985
+int8_dyn     0.61    0.65     445.2    3.07    0.9954    0.5924
+==============================================================================
+
+=== all assays done: job 5394147 ===

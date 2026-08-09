@@ -1,0 +1,35 @@
+=== node: ghnode001 ===
+NVIDIA H200, 143771 MiB, 550.54.14
+torch 2.6.0+cu124 | cc (9, 0)
+
+[setup] device=cuda model=3B attn=sdpa
+[setup] 64 sequences -> 3 bucketed batches, padding waste 0.0% (naive fixed-size would be 25.0%)
+[setup] DMS: 200 variants over 11 masked positions (WT length 40)
+
+=== fp32 ===
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:17<00:17, 17.14s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:19<00:00,  8.18s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:19<00:00,  9.53s/it]
+  weights 10.718 GB | peak 25.369 GB | 6715.5 res/s
+
+=== bf16 ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:25<00:25, 25.84s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:29<00:00, 12.63s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:29<00:00, 14.61s/it]
+  weights 5.288 GB | peak 12.635 GB | 56147.8 res/s
+  emb cos 0.999949 | logit KL 1.172e-04
+  DMS spearman vs fp32 0.9999 | max drift 0.019
+
+=== int4_wo ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:25<00:25, 25.95s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:29<00:00, 12.64s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:29<00:00, 14.63s/it]
+[quant] int4_wo: applied torchao to 216 encoder Linears
+  weights 1.605 GB | peak 7.686 GB | 3812.6 res/s
+  emb cos 0.998904 | logit KL 1.886e-03
+  DMS spearman vs fp32 0.9975 | max drift 0.221
+
+[done] wrote results/matrix_3B_5393520.json
+
+==============================================================================
+config        wGB  peakGB      res/s  speedup    embcos   DMSrho
+------------------------------------------------------------------------------
+fp32        10.72   25.37     6715.5    0.12x       nan      nan
+bf16         5.29   12.63    56147.8    1.00x  0.999949   0.9999
+int4_wo      1.60    7.69     3812.6    0.07x  0.998904   0.9975
+==============================================================================

@@ -1,0 +1,36 @@
+# Scratch space and session bookkeeping
+.tmp/
+record
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Benchmark data: ~230 MB, and fully regenerable.
+#   python src/fetch_proteingym_v1.py
+# index.json IS tracked -- it carries the wild-type sequences and the assay
+# manifest, so the fetch is verifiable against a committed reference.
+data/proteingym_v1/_raw/
+data/proteingym_v1/assays/
+
+# Per-variant predictions: ~90 MB across 12 model/config combinations. Too
+# large for git; released separately (see preprint/SUBMISSION.md) and
+# regenerable with slurm/run_proteingym.sbatch. The derived per-assay CSVs and
+# summary JSONs ARE tracked -- every table in the paper comes from those.
+results/proteingym/*.jsonl.gz
+results/pgym_smoke/*.jsonl.gz
+
+# LaTeX intermediates. Patterns are directory-scoped on purpose: a bare *.out
+# would also swallow results/slurm-*.out, which is run provenance.
+report/*.aux
+report/*.log
+report/*.out
+preprint/*.aux
+preprint/*.log
+preprint/*.out
+
+# Rebuilt by preprint/build.sh
+preprint/arxiv-submission.tar.gz
+
+# 258 KB of pip output
+env/setup.log

@@ -1,0 +1,19 @@
+=== node: ghnode001 ===
+NVIDIA H200, 143771 MiB, 550.54.14
+torch 2.6.0+cu124 | cc (9, 0)
+
+
+############################################################
+### ASSAY: IF1_ECOLI_Kelsic_2016
+############################################################
+usage: run_matrix.py [-h] [--model MODEL] [--configs CONFIGS]
+                     [--attn {sdpa,eager}] [--compile]
+                     [--compile_mode COMPILE_MODE] [--fasta FASTA]
+                     [--n_seqs N_SEQS] [--lengths LENGTHS] [--max_len MAX_LEN]
+                     [--token_budget TOKEN_BUDGET] [--fidelity_n FIDELITY_N]
+                     [--skip_dms] [--skip_throughput] [--dms_csv DMS_CSV]
+                     [--dms_wt DMS_WT] [--dms_variant_col DMS_VARIANT_COL]
+                     [--dms_score_col DMS_SCORE_COL] [--dms_len DMS_LEN]
+                     [--n_variants N_VARIANTS] [--dms_batch DMS_BATCH]
+                     [--dms_compiled] [--out OUT]
+run_matrix.py: error: unrecognized arguments: 3B fp32,bf16,int8_wo,int8_dyn,fp8_dyn,int4_wo

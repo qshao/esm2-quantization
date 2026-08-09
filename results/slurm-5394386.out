@@ -1,0 +1,189 @@
+=== node: ghnode001 ===
+NVIDIA H200, 143771 MiB, 550.54.14
+torch 2.6.0+cu124 | cc (9, 0)
+
+
+############################################################
+### ASSAY: IF1_ECOLI_Kelsic_2016
+############################################################
+[setup] device=cuda model=3B attn=sdpa
+[setup] 4 sequences -> 1 bucketed batches, padding waste 50.0% (naive fixed-size would be 50.0%)
+[setup] DMS: 1367 variants over 72 masked positions (WT length 72)
+
+=== fp32 ===
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:12<00:12, 12.68s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:14<00:00,  6.22s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:14<00:00,  7.19s/it]
+  weights 10.718 GB | peak ? GB | ? res/s
+
+=== bf16 ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.21s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.57s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.96s/it]
+  weights 5.288 GB | peak ? GB | ? res/s
+  emb cos 0.999964 | logit KL 1.481e-04
+  DMS spearman vs fp32 0.9998 | max drift 0.452
+
+=== int8_wo ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.41s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  2.61s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.03s/it]
+[quant] int8_wo: applied torchao to 216 encoder Linears
+  weights 2.659 GB | peak ? GB | ? res/s
+  emb cos 0.999972 | logit KL 1.482e-04
+  DMS spearman vs fp32 0.9997 | max drift 0.406
+
+=== int8_dyn ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.40s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  2.60s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.02s/it]
+[quant] int8_dyn: applied torchao to 216 encoder Linears
+  weights 2.653 GB | peak ? GB | ? res/s
+  emb cos 0.991197 | logit KL 1.339e-02
+  DMS spearman vs fp32 0.9893 | max drift 2.594
+
+=== fp8_dyn ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.46s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  2.63s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.05s/it]
+[quant] fp8_dyn: applied torchao to 216 encoder Linears
+  weights 2.653 GB | peak ? GB | ? res/s
+  emb cos 0.999628 | logit KL 1.198e-03
+  DMS spearman vs fp32 0.9957 | max drift 2.275
+
+=== int4_wo ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.53s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  2.65s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.08s/it]
+[quant] int4_wo: applied torchao to 216 encoder Linears
+  weights 1.606 GB | peak ? GB | ? res/s
+  emb cos 0.998944 | logit KL 2.379e-03
+  DMS spearman vs fp32 0.9771 | max drift 5.011
+[done] wrote results/dms_3B_IF1_ECOLI_Kelsic_2016_5394386_scores.json (1367 variants x 6 configs)
+
+[done] wrote results/dms_3B_IF1_ECOLI_Kelsic_2016_5394386.json
+
+==============================================================================
+DMS workload: accuracy / speed / RAM
+config        wGB  peakGB     var/s     sec  rho_fp32  rho_expt
+------------------------------------------------------------------------------
+fp32        10.72   10.87    1459.9    0.94     (ref)    0.5561
+bf16         5.29    5.38    6978.7    0.20    0.9998    0.5543
+int8_wo      2.66    2.77    4830.1    0.28    0.9997    0.5570
+int8_dyn     2.65    2.87     410.1    3.33    0.9893    0.5504
+fp8_dyn      2.65    2.76    1812.5    0.75    0.9957    0.5584
+int4_wo      1.61    1.70    1044.5    1.31    0.9771    0.5394
+==============================================================================
+
+############################################################
+### ASSAY: BLAT_ECOLX_Stiffler_2015
+############################################################
+[setup] device=cuda model=3B attn=sdpa
+[setup] 4 sequences -> 1 bucketed batches, padding waste 50.0% (naive fixed-size would be 50.0%)
+[setup] DMS: 4996 variants over 263 masked positions (WT length 286)
+
+=== fp32 ===
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.03s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.41s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.80s/it]
+  weights 10.718 GB | peak ? GB | ? res/s
+
+=== bf16 ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.76s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  2.75s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.20s/it]
+  weights 5.288 GB | peak ? GB | ? res/s
+  emb cos 0.999964 | logit KL 1.481e-04
+  DMS spearman vs fp32 0.9997 | max drift 0.556
+
+=== int8_wo ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.35s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  2.60s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.01s/it]
+[quant] int8_wo: applied torchao to 216 encoder Linears
+  weights 2.659 GB | peak ? GB | ? res/s
+  emb cos 0.999972 | logit KL 1.482e-04
+  DMS spearman vs fp32 0.9993 | max drift 0.740
+
+=== int8_dyn ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.34s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.58s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.99s/it]
+[quant] int8_dyn: applied torchao to 216 encoder Linears
+  weights 2.653 GB | peak ? GB | ? res/s
+  emb cos 0.991197 | logit KL 1.339e-02
+  DMS spearman vs fp32 0.9824 | max drift 4.281
+
+=== fp8_dyn ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.34s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.58s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.99s/it]
+[quant] fp8_dyn: applied torchao to 216 encoder Linears
+  weights 2.653 GB | peak ? GB | ? res/s
+  emb cos 0.999628 | logit KL 1.198e-03
+  DMS spearman vs fp32 0.9899 | max drift 3.701
+
+=== int4_wo ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.31s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.57s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.98s/it]
+[quant] int4_wo: applied torchao to 216 encoder Linears
+  weights 1.606 GB | peak ? GB | ? res/s
+  emb cos 0.998944 | logit KL 2.379e-03
+  DMS spearman vs fp32 0.9634 | max drift 7.083
+[done] wrote results/dms_3B_BLAT_ECOLX_Stiffler_2015_5394386_scores.json (4996 variants x 6 configs)
+
+[done] wrote results/dms_3B_BLAT_ECOLX_Stiffler_2015_5394386.json
+
+==============================================================================
+DMS workload: accuracy / speed / RAM
+config        wGB  peakGB     var/s     sec  rho_fp32  rho_expt
+------------------------------------------------------------------------------
+fp32        10.72   11.19     447.4   11.17     (ref)    0.5893
+bf16         5.29    5.55    3573.3    1.40    0.9997    0.5896
+int8_wo      2.66    2.92    2511.3    1.99    0.9993    0.5913
+int8_dyn     2.65    2.91     381.6   13.09    0.9824    0.6160
+fp8_dyn      2.65    2.96    1796.1    2.78    0.9899    0.6088
+int4_wo      1.61    1.87     282.4   17.69    0.9634    0.6388
+==============================================================================
+
+############################################################
+### ASSAY: HSP82_YEAST_Flynn_2019
+############################################################
+[setup] device=cuda model=3B attn=sdpa
+[setup] 4 sequences -> 1 bucketed batches, padding waste 50.0% (naive fixed-size would be 50.0%)
+[setup] DMS: 13194 variants over 707 masked positions (WT length 709)
+
+=== fp32 ===
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:04<00:04,  4.73s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.25s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.62s/it]
+  weights 10.718 GB | peak ? GB | ? res/s
+
+=== bf16 ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.60s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  2.68s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.12s/it]
+  weights 5.288 GB | peak ? GB | ? res/s
+  emb cos 0.999964 | logit KL 1.481e-04
+  DMS spearman vs fp32 0.9998 | max drift 0.499
+
+=== int8_wo ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.47s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  2.63s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.05s/it]
+[quant] int8_wo: applied torchao to 216 encoder Linears
+  weights 2.659 GB | peak ? GB | ? res/s
+  emb cos 0.999972 | logit KL 1.482e-04
+  DMS spearman vs fp32 0.9997 | max drift 0.779
+
+=== int8_dyn ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.29s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.56s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.97s/it]
+[quant] int8_dyn: applied torchao to 216 encoder Linears
+  weights 2.653 GB | peak ? GB | ? res/s
+  emb cos 0.991197 | logit KL 1.339e-02
+  DMS spearman vs fp32 0.9893 | max drift 3.403
+
+=== fp8_dyn ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.54s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  2.65s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.09s/it]
+[quant] fp8_dyn: applied torchao to 216 encoder Linears
+  weights 2.653 GB | peak ? GB | ? res/s
+  emb cos 0.999628 | logit KL 1.198e-03
+  DMS spearman vs fp32 0.9956 | max drift 2.177
+
+=== int4_wo ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.55s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  2.67s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.10s/it]
+[quant] int4_wo: applied torchao to 216 encoder Linears
+  weights 1.606 GB | peak ? GB | ? res/s
+  emb cos 0.998944 | logit KL 2.379e-03
+  DMS spearman vs fp32 0.9839 | max drift 4.543
+[done] wrote results/dms_3B_HSP82_YEAST_Flynn_2019_5394386_scores.json (13194 variants x 6 configs)
+
+[done] wrote results/dms_3B_HSP82_YEAST_Flynn_2019_5394386.json
+
+==============================================================================
+DMS workload: accuracy / speed / RAM
+config        wGB  peakGB     var/s     sec  rho_fp32  rho_expt
+------------------------------------------------------------------------------
+fp32        10.72   11.85     186.7   70.68     (ref)    0.2931
+bf16         5.29    5.88    1356.9    9.72    0.9998    0.2933
+int8_wo      2.66    3.25    1065.9   12.38    0.9997    0.2933
+int8_dyn     2.65    3.36     298.6   44.19    0.9893    0.2937
+fp8_dyn      2.65    3.35    1102.7   11.97    0.9956    0.2944
+int4_wo      1.61    2.20     112.3  117.51    0.9839    0.2904
+==============================================================================
+
+=== all assays done: job 5394386 ===

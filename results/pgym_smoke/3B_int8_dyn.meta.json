@@ -1,0 +1,15 @@
+{
+  "model": "3B",
+  "config": "int8_dyn",
+  "device": "cuda",
+  "attn": "sdpa",
+  "weight_gb": 2.653,
+  "load_seconds": 331.9,
+  "max_len": 1022,
+  "dms_batch": 8,
+  "n_assays": 3,
+  "skipped_too_long": [],
+  "slurm_jobs": [
+    "5395034"
+  ]
+}
