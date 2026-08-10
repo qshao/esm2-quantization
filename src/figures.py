@@ -99,6 +99,27 @@ def _audit(fig, name, pad=1.0):
                 if hit:
                     _AUDIT.append(
                         (name, f"axes {i}: {what} covers {hit} plotted point(s)"))
+        # Text-vs-text: two annotations (or an annotation and the legend)
+        # whose boxes intersect read as one garbled string. Missed this once
+        # (fig_pareto's int8_dyn/fp8_dyn labels ran into each other) because
+        # the checks above only compare text against axes edges and data.
+        boxes = []
+        for art, kind in artists:
+            try:
+                bb = art.get_window_extent()
+            except Exception:
+                continue
+            if bb.width == 0 or bb.height == 0:
+                continue
+            lbl = (repr(art.get_text())[:24] if kind == "annotation" else "legend")
+            boxes.append((lbl, bb))
+        for j in range(len(boxes)):
+            for k in range(j + 1, len(boxes)):
+                (l1, b1), (l2, b2) = boxes[j], boxes[k]
+                if (b1.x0 < b2.x1 - pad and b1.x1 > b2.x0 + pad
+                        and b1.y0 < b2.y1 - pad and b1.y1 > b2.y0 + pad):
+                    _AUDIT.append(
+                        (name, f"axes {i}: {l1} overlaps {l2}"))
 
 
 def _save(fig, name):
@@ -208,7 +229,7 @@ def fig_pareto():
     # Hand-placed label offsets: the interesting configurations cluster tightly
     # in both panels, so the default offset overlaps them into illegibility.
     off_bulk = {"fp32": (7, 2), "bf16": (7, 2), "int8_wo": (-8, 9),
-                "int8_dyn": (-46, -11), "fp8_dyn": (-16, -13), "int4_wo": (7, 2)}
+                "int8_dyn": (-50, -8), "fp8_dyn": (-50, -19), "int4_wo": (7, 2)}
     off_dms = {"fp32": (7, 2), "bf16": (7, 2), "int8_wo": (5, 7),
                "fp8_dyn": (-10, -13), "int8_dyn": (-14, 8), "int4_wo": (4, -13)}
     fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.7))
