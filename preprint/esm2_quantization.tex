@@ -595,6 +595,7 @@ kernel-selection effect rather than a Dynamo fallback.
 attention, 64 sequences of length 512--1024 under a 16{,}384-token budget.
 Reproduced across four independent jobs: bf16 mean 56{,}642 residues/s, range
 55{,}941--57{,}422 ($\pm 1.3\%$); fp32 mean 6{,}742, range 6{,}687--6{,}814.}
+\label{tab:bulk}
 \small
 \begin{tabular}{lrrrrrrr}
 \toprule
@@ -1254,16 +1255,22 @@ quantization --- one keyword argument, no calibration. \cfg{int8\_dyn\_sq} adds
 SmoothQuant with $\alpha = 0.5$ calibrated on 16 target sequences. Both
 eliminate all six damaged assays and cut the worst case by an order of
 magnitude. The defect is therefore in the default activation scaling, not in
-W8A8.}
+W8A8. Intervals are the same protein-clustered paired bootstrap used throughout
+($R = 20{,}000$); none of the three differs significantly from fp32 on the
+\emph{mean}, which is exactly the point --- the mean cannot separate them and
+the worst case can. Worst-assay fidelity $\rho_{\text{fp32}}$ is $0.393$,
+$0.965$ and $0.737$ respectively. These two remedy comparisons bring the family
+of tests against fp32 to 17, giving a Bonferroni threshold of $0.0029$; the
+conclusions in Section~\ref{sec:full} are unchanged by the revised denominator.}
 \label{tab:w8a8}
 \small
-\begin{tabular}{lrrrrrr}
+\begin{tabular}{lrlrrrr}
 \toprule
-Config & mean $\Delta$ & worst $\Delta$ & $|\Delta|>0.05$ & worst $\rho_{\text{fp32}}$ & pos/s & peak GB \\
+Config & mean $\Delta$ & 95\% CI & worst $\Delta$ & $|\Delta|>0.05$ & pos/s & peak GB \\
 \midrule
-\cfg{int8\_dyn}       & $-0.0021$ & $\mathbf{-0.3688}$ & 6 & 0.393 & 17.0 & 3.51 \\
-\cfg{int8\_dyn\_asym} & $-0.0001$ & $-0.0395$ & \textbf{0} & 0.965 & \textbf{33.1} & 4.13 \\
-\cfg{int8\_dyn\_sq}   & $+0.0002$ & $\mathbf{-0.0237}$ & \textbf{0} & 0.737 & 16.9 & 3.66 \\
+\cfg{int8\_dyn}       & $-0.0021$ & $[-0.0072,+0.0017]$ & $\mathbf{-0.3688}$ & 6 & 17.0 & 3.51 \\
+\cfg{int8\_dyn\_asym} & $-0.0001$ & $[-0.0009,+0.0008]$ & $-0.0395$ & \textbf{0} & \textbf{33.1} & 4.13 \\
+\cfg{int8\_dyn\_sq}   & $+0.0002$ & $[-0.0008,+0.0011]$ & $\mathbf{-0.0237}$ & \textbf{0} & 16.9 & 3.66 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1303,6 +1310,63 @@ unsafe on ESM-2 and that a one-line change repairs it. Symmetric scaling
 allocates half the INT8 range to values of a sign that post-GELU activations
 rarely take, which is a plausible account of why the asymmetric variant helps,
 though we have not isolated it.
+
+\subsubsection*{The repair helps accuracy on both workloads and speed on only one}
+
+The asymmetric variant was adopted above on DMS evidence, where it is both more
+accurate and $1.95\times$ faster than symmetric. Applying that conclusion to
+bulk embedding without measuring it would repeat the error this paper is about,
+so we measured it (Table~\ref{tab:asymbulk}).
+
+\begin{table}[htb]
+\centering
+\caption{Bulk embedding extraction at 3B on an H200 under
+\texttt{max-autotune}, all configurations from a single run so the comparison is
+internal. Settings differ from Table~\ref{tab:bulk} (32 sequences at 13.1\%
+padding waste rather than 64 at 0\%), so the absolute rates are not comparable
+across the two tables; the ratios within this one are. \cfg{int8\_dyn\_asym}
+recovers almost all of the fidelity that symmetric scaling loses --- embedding
+cosine $0.9906 \to 0.9993$ --- but is $14$\% \emph{slower} than symmetric here,
+having been $95$\% faster on DMS.}
+\label{tab:asymbulk}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Config & residues/s & vs bf16 & peak GB & emb.\ cos & DMS $\rho_{\text{fp32}}$ \\
+\midrule
+\cfg{fp32}            &  5{,}775 & 0.12$\times$ & 19.90 & ---      & --- \\
+\cfg{bf16}            & 48{,}459 & 1.00$\times$ &  8.92 & 0.999933 & 0.9998 \\
+\cfg{int8\_wo}        & 46{,}434 & 0.96$\times$ &  6.34 & 0.999865 & 0.9998 \\
+\cfg{int8\_dyn}       & 49{,}871 & 1.03$\times$ &  5.43 & 0.990609 & 0.9928 \\
+\cfg{int8\_dyn\_asym} & 42{,}659 & 0.88$\times$ &  5.58 & 0.999276 & 0.9972 \\
+\cfg{fp8\_dyn}        & \textbf{54{,}198} & \textbf{1.12$\times$} &  5.54 & 0.999162 & 0.9988 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two consequences, and the second corrects a recommendation we made on the
+strength of the DMS result alone.
+
+The \emph{accuracy} repair transfers: embedding cosine goes from $0.9906$ under
+symmetric scaling to $0.9993$ under asymmetric, and DMS $\rho_{\text{fp32}}$
+from $0.9928$ to $0.9972$. Whatever symmetric scaling is doing wrong, it is not
+specific to the masked-marginals input distribution.
+
+The \emph{speed} effect reverses. Asymmetric is $1.95\times$ faster than
+symmetric on DMS and $0.85\times$ its speed on bulk extraction. It is therefore
+not the right choice for bulk embedding on hardware without FP8:
+\textbf{\cfg{int8\_wo} beats it on both axes that matter there}, being faster
+($0.96\times$ against $0.88\times$ bf16) and more faithful (embedding cosine
+$0.999865$ against $0.999276$), at $0.76$\,GB more peak memory. Our
+recommendation table previously said otherwise, on DMS evidence extrapolated to
+a workload where it does not hold.
+
+We were unable to obtain the corresponding A100 measurement --- the partition
+was occupied by a multi-day job for the duration of this revision --- so the
+ranking above is established on H200 and the A100-specific bulk numbers for the
+asymmetric variant remain unmeasured. We state the recommendation for
+FP8-less hardware as an inference from the H200 ordering rather than as a
+measurement, and mark it as such in Table~\ref{tab:recs}.
 
 \subsubsection*{A label-free screen for which assays are at risk}
 \label{sec:snr}
@@ -1585,7 +1649,8 @@ pipeline, this is a live risk rather than a theoretical one.
 Figure~\ref{fig:pareto} shows the two frontiers side by side.
 
 \textbf{This conflict is bounded by scale, and we would not have known that from
-one model.} The mechanism is that \cfg{fp8\_dyn}'s per-call quantization
+one model.} (The evidence is one-sided: the DMS side of the comparison spans
+three scales, the bulk-embedding side is measured at 3B only.) The mechanism is that \cfg{fp8\_dyn}'s per-call quantization
 overhead is fixed while the useful work grows with hidden size, so the penalty
 shrinks as the model grows: $0.30\times$ bf16 DMS speed at 650M, $0.44\times$ at
 3B, $0.97\times$ at 15B (Table~\ref{tab:scale}). By 15B the DMS batch is large
@@ -1682,7 +1747,15 @@ $0.018$ across 402 assay/model pairs), \cfg{fp8\_dyn} is nearly so ($0.034$), an
 
 \begin{table}[htb]
 \centering
-\caption{Configuration recommendations by situation. The first two rows differ because the two workloads sit in different bottleneck regimes, not because of any accuracy difference.}
+\caption{Recommendations by workload and binding constraint. Model scale is the
+first decision rather than a column, because the cross-scale Pareto surface
+(Table~\ref{tab:pareto}) shows every 3B and 15B configuration to be dominated by
+a 650M one for this workload. Two rows were wrong in earlier drafts and are
+corrected here on measured evidence: 3B/\cfg{int4\_wo} for minimum memory (it
+uses more memory than 650M/\cfg{bf16}, is less accurate and is $20\times$
+slower), and asymmetric \cfg{int8\_dyn} for FP8-less bulk extraction (it is
+slower \emph{and} less faithful than \cfg{int8\_wo} there, Table~\ref{tab:asymbulk}).}
+\label{tab:recs}
 \small
 \begin{tabular}{lll}
 \toprule
@@ -1694,14 +1767,22 @@ Variant-effect scoring & memory     & 650M/\cfg{int8\_wo} (0.73\,GB) before any 
                        &            & \quad quantization of a larger model \\
 Variant-effect scoring & 3B/15B fixed & \cfg{bf16} up to 3B; \cfg{fp8\_dyn} at 15B \\
 Bulk embedding (H200)  & throughput & \cfg{fp8\_dyn} + \texttt{max-autotune-no-cudagraphs} \\
-Bulk embedding (A100)  & throughput & \cfg{int8\_dyn} with \emph{asymmetric} activations; \\
-                       &            & \quad the symmetric default is unsafe \\
-Minimum footprint      & memory     & 650M/\cfg{int4\_wo} (0.60\,GB), after checking \\
-                       &            & \quad drift on \emph{your} target; worst $-0.06$ \\
+Bulk embedding (A100)  & throughput & \cfg{int8\_wo}$^\dagger$ --- faster \emph{and} more \\
+                       &            & \quad faithful than asymmetric \cfg{int8\_dyn} \\
+                       &            & \quad on this workload; avoid symmetric \\
+Minimum footprint      & memory     & 650M/\cfg{int4\_wo} (0.60\,GB), only after \\
+                       &            & \quad checking drift on \emph{your} target: worst \\
+                       &            & \quad $-0.20$, or $-0.05$ on assays with signal \\
 QLoRA fine-tuning base & memory     & \cfg{int4\_wo} at the scale being tuned \\
 V100 / sm\_70          & any        & Quantization buys memory only, never speed \\
 \bottomrule
 \end{tabular}
+
+\vspace{3pt}
+{\footnotesize $^\dagger$ Inferred from the H200 ordering in
+Table~\ref{tab:asymbulk}. The A100 partition was occupied by a multi-day job
+for the duration of this revision, so the A100-specific bulk numbers are
+unmeasured.}
 \end{table}
 
 Two non-quantization measures outweigh most of the above. Moving from fp32 to
@@ -1814,7 +1895,8 @@ three would have saved a further thirteen and left a third.
         four.
   \item \textbf{Only two results survive multiple-comparison correction.}
         Fifteen comparisons against fp32 are reported (five configurations at
-        three scales), against a Bonferroni threshold of $0.0033$. Only
+        three scales, plus two W8A8 remedies), against a Bonferroni threshold of
+        $0.0029$. Only
         \cfg{int8\_dyn} at 650M ($p = 0.0003$) and the 3B--650M interaction
         contrast for \cfg{int4\_wo} ($p = 0.0007$) clear it. The individual
         \cfg{int4\_wo} effects at 650M and 3B are nominal only
@@ -1834,6 +1916,13 @@ three would have saved a further thirteen and left a third.
   \item \textbf{The asymmetric repair is measured at one scale.} The W8A8
         comparison is 3B only; we did not re-run it at 650M or 15B, so the
         repair is established where the failure was and not shown to be general.
+  \item \textbf{The bulk-embedding workload is measured at one scale.} Accuracy,
+        memory and DMS speed are reported at 650M, 3B and 15B, but bulk
+        throughput only at 3B. The claim that the two workloads prefer opposite
+        configurations, and the finding that the conflict dissolves by 15B, are
+        therefore asymmetric in their evidence: the DMS side spans three scales
+        and the embedding side does not. We would not assume the embedding-side
+        ranking is scale-invariant merely because we did not measure it.
   \item \textbf{The signal threshold is arbitrary.} Conditioning the tail on
         $\rho_{\text{fp32}} > 0.3$ is a judgement call. We report the
         sensitivity across cuts from $0.0$ to $0.4$; the 3B \cfg{int8\_dyn}
@@ -1889,6 +1978,9 @@ three would have saved a further thirteen and left a third.
         \emph{symmetric} activation scaling: switching to asymmetric --- one
         keyword, no calibration --- removes all six damaged assays and cuts the
         worst case to $-0.04$, and SmoothQuant does the same at higher cost.
+        The accuracy repair transfers to bulk extraction (embedding cosine
+        $0.9906 \to 0.9993$); its \emph{speed} advantage does not, reversing
+        from $1.95\times$ symmetric on DMS to $0.85\times$ on bulk.
         Neither configuration is fast enough to displace \cfg{bf16} for
         variant-effect scoring, but the blanket advice to avoid W8A8 on ESM-2
         would have been wrong.
