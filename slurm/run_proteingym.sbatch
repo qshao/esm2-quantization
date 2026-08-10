@@ -15,6 +15,12 @@
 #   sbatch --array=0-5 -p H8V141_SAP112M2000_L --mem=200G slurm/run_proteingym.sbatch 3B
 #   sbatch --array=0-5 -p A2V80_ICE56M256_L    --mem=120G slurm/run_proteingym.sbatch 650M
 #
+# An optional second argument overrides the config list, for the W8A8 repairs
+# that are not part of the six-config sweep. Size the array to match it:
+#
+#   sbatch --array=0-1 -p H8V141_SAP112M2000_L --mem=200G \
+#       slurm/run_proteingym.sbatch 3B int8_dyn_asym,int8_dyn_sq
+#
 # One array task per quantization config, and the tasks are genuinely
 # independent: each writes only its own per-variant scores, and every
 # cross-config comparison (rho vs fp32, paired bootstrap) is deferred to
@@ -37,6 +43,15 @@ CONFIGS=(fp32 bf16 int8_wo int8_dyn fp8_dyn int4_wo)
 # leave the arg in "$@" to be appended to the python command as a stray
 # positional. Shift only what is actually there.
 shift $(( $# > 1 ? 1 : $# ))
+
+# A second positional argument replaces the config list. Anything starting with
+# `-` is a flag for run_proteingym.py, not a config list, so it is left in "$@"
+# -- otherwise `... 3B --dms_batch 4` would silently be read as one config named
+# "--dms_batch" and score nothing.
+if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then
+    IFS=',' read -r -a CONFIGS <<< "$1"
+    shift
+fi
 
 IDX="${SLURM_ARRAY_TASK_ID:-0}"
 if [ "$IDX" -ge "${#CONFIGS[@]}" ]; then

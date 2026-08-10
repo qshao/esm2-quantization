@@ -329,7 +329,17 @@ because its INT8/FP8 paths dispatch to \texttt{torch.\_int\_mm} and
 
 \section{Results}
 
+Sections~\ref{sec:compile}--\ref{sec:pilotscale} establish the speed, memory and
+fidelity behaviour of each configuration on the two workloads, taking ground
+truth from three hand-picked assays --- enough to show that an effect exists on
+a particular assay, not enough to generalise from it.
+Section~\ref{sec:full} repeats the accuracy measurement on the complete
+201-assay benchmark at three model scales and overturns two conclusions the
+three-assay pilot supported; each retraction is stated where the original claim
+was made.
+
 \subsection{Compile mode determines whether W8A8 is viable at all}
+\label{sec:compile}
 
 The single most consequential configuration choice is not the quantization
 scheme but the \texttt{torch.compile} mode. Measured on a single ESM2-3B-shaped
@@ -542,6 +552,7 @@ which assay to trust is a $2\times$ effect; choosing a quantization
 configuration is a $1\%$ effect.
 
 \subsection{Model-scale consistency}
+\label{sec:pilotscale}
 
 The same three assays were run on ESM2-650M. The qualitative picture holds:
 bf16 fastest, \cfg{int8\_dyn} slowest, ground-truth shifts small. The largest
@@ -554,33 +565,20 @@ shows a significant effect at all (Table~\ref{tab:acc3}), so sensitivity does
 not increase monotonically with size; it is simply not a function of size in any
 usable way.
 
-An incidental observation deserves note, because it bears directly on how much
-any of this matters. The fp32 650M model correlates with experiment
-\emph{better} than the fp32 3B model on two of the three assays:
+The pilot appeared to say something stronger as well. The fp32 650M model
+correlated with experiment \emph{better} than fp32 3B on two of the three
+assays, and on BLAT by $0.1422$ ($0.7315$ against $0.5893$) --- roughly
+\emph{three times} the largest effect any quantization configuration produced in
+this study. The inference drawn was that model selection dominates precision
+selection by a wide margin.
 
-\begin{table}[htb]
-\centering
-\small
-\begin{tabular}{lrrr}
-\toprule
-Assay & 650M $\rho_{\text{expt}}$ & 3B $\rho_{\text{expt}}$ & Difference \\
-\midrule
-IF1   & 0.5987 & 0.5561 & $-0.0426$ \\
-BLAT  & 0.7315 & 0.5893 & $-0.1422$ \\
-HSP82 & 0.2648 & 0.2931 & $+0.0283$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The BLAT gap of $0.14$ is roughly \emph{three times} the largest effect any
-quantization configuration produced in this study. Model selection dominates
-precision selection by a wide margin, and the assumption that the larger
-checkpoint is the more accurate one does not hold uniformly here.
-
-\emph{This inference does not survive Section~\ref{sec:full}.} Over 201 assays
-the two models are statistically indistinguishable ($p=0.35$). The BLAT gap is
-real for BLAT and does not generalise --- the same error, made the same way, as
-the \cfg{int4\_wo} result three subsections above.
+\emph{That inference does not survive Section~\ref{sec:full}.} Over 201 assays
+the two models are statistically indistinguishable ($p=0.35$), and a third scale
+makes the picture worse for the larger checkpoint rather than better: fp32 mean
+$\rho$ falls monotonically $0.4459 \to 0.4398 \to 0.4323$ from 650M to 3B to
+15B, with no pairwise difference significant. The BLAT gap is real for BLAT and
+does not generalise --- the same error, made the same way, as the
+\cfg{int4\_wo} result three subsections above.
 
 \subsection{The full benchmark at three model scales}
 \label{sec:full}
@@ -1435,10 +1433,29 @@ sbatch --array=0-5 -p H8V141_SAP112M2000_L --mem=200G \
 sbatch --array=0-5 -p H8V141_SAP112M2000_L --mem=300G --time=12:00:00 \
     slurm/run_proteingym.sbatch 15B
 
+# The two W8A8 repairs: asymmetric activations, and SmoothQuant with
+# 16 calibration sequences.
+sbatch --array=0-1 -p H8V141_SAP112M2000_L --mem=200G \
+    slurm/run_proteingym.sbatch 3B int8_dyn_asym,int8_dyn_sq
+
 # Benchmark-wide accuracy / speed / RAM + protein-clustered bootstrap
 python src/aggregate_proteingym.py --model 3B
 python src/aggregate_proteingym.py --model 650M
 python src/aggregate_proteingym.py --model 15B
+
+# --- Analyses reported here -------------------------------------------
+# Pareto surface, interaction contrasts, conditioned tail, aggregation
+# conventions with post-stratification, and the SNR screen
+python src/analyze_scales.py
+
+# W8A8 repair, per assay -> results/proteingym/w8a8_remedies.csv
+python src/analyze_w8a8.py
+
+# Repeatability floor: rep2 against the primary run, bitwise
+python src/analyze_repeat.py
+
+# Per-channel activation profile of the collapsing assay vs controls
+sbatch -p H8V141_SAP112M2000_L --mem=200G slurm/run_outliers.sbatch
 
 # Figures (also used by the preprint)
 python src/figures.py

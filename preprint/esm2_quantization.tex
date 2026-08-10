@@ -33,33 +33,30 @@ University of Kentucky, Lexington, KY 40506}
 \begin{abstract}
 \noindent
 We benchmark six numerical precision configurations for ESM-2 protein language
-models across three axes --- throughput, memory footprint, and predictive
-accuracy --- on two workloads with sharply different characteristics: bulk
-embedding extraction and deep mutational scanning (DMS) variant-effect scoring.
-Accuracy is evaluated on the complete ProteinGym substitution benchmark ---
-201 assays, 2.41M variants --- at \textbf{three model scales spanning 650M to
-15B parameters}, with a paired bootstrap clustered on protein. Three findings
-follow, and each contradicts a common practice. First, \textbf{benchmark
-averages conceal the failure that decides deployability}: no configuration
-shifts mean correlation by more than $0.007$ at any scale, yet INT8 dynamic
-quantization --- indistinguishable from fp32 on that mean at 3B ($p = 0.34$) ---
-takes a single assay from $\rho = 0.591$ to $0.223$. Selection must be made on
-worst-case, not mean, behaviour. Second, \textbf{fidelity measured against fp32
-bounds risk but cannot rank quality}: over 3015 assay/configuration pairs it
-predicts the \emph{magnitude} of ground-truth change ($r = 0.56$--$0.81$) but
-not its \emph{direction}: the INT4 effect differs significantly between 650M and
-3B ($+0.0101$, $p = 0.0007$) with no monotone trend to extrapolate. Third, and
-of most practical consequence, \textbf{quantizing a large model is dominated by
-using a small one}: of eighteen scale/configuration combinations only three are
-Pareto-optimal over accuracy, memory and speed, and all three are 650M. INT4 at
-3B --- a natural choice for a small memory footprint --- uses more memory than
-650M in bf16 while being less accurate and $20\times$ slower. We further show that the single
-catastrophic failure we observe --- INT8 dynamic quantization taking one assay
-from $\rho = 0.591$ to $0.223$ --- is a defect of default \emph{symmetric}
-activation scaling rather than of W8A8 itself: asymmetric activation
-quantization, a one-line change requiring no calibration, removes every damaged
-assay. We also report four measurement artifacts encountered during this study,
-three of which inverted the result they were meant to measure.
+models across throughput, memory footprint and predictive accuracy, on two
+workloads with sharply different characteristics: bulk embedding extraction and
+deep mutational scanning (DMS) variant-effect scoring. Accuracy is evaluated on
+the complete ProteinGym substitution benchmark --- 201 assays, 2.41M variants
+--- at \textbf{three model scales spanning 650M to 15B parameters}, with a
+paired bootstrap clustered on protein. Three findings follow, and each
+contradicts a common practice. First, \textbf{benchmark averages conceal the
+failure that decides deployability}: no configuration shifts mean correlation by
+more than $0.007$ at any scale, yet INT8 dynamic quantization ---
+indistinguishable from fp32 on that mean at 3B ($p = 0.34$) --- takes a single
+assay from $\rho = 0.591$ to $0.223$. Selection must be made on worst-case, not
+mean, behaviour. Second, \textbf{fidelity measured against fp32 bounds risk but
+cannot rank quality}: over 3015 assay/configuration pairs it predicts the
+\emph{magnitude} of ground-truth change ($r = 0.56$--$0.81$) but not its
+\emph{direction}, and the INT4 effect differs significantly between 650M and 3B
+($+0.0101$, $p = 0.0007$) with no monotone trend to extrapolate. Third,
+\textbf{quantizing a large model is dominated by using a small one}: of eighteen
+scale/configuration combinations only three are Pareto-optimal over accuracy,
+memory and speed, and all three are 650M. The one catastrophic failure we
+observe is a defect of default \emph{symmetric} activation scaling, not of W8A8
+itself: asymmetric activation quantization, a one-line change needing no
+calibration, removes every damaged assay. We also give a label-free screen for
+at-risk targets, and report four measurement artifacts encountered during this
+study, three of which inverted the result they were meant to measure.
 \end{abstract}
 
 \noindent
@@ -182,7 +179,8 @@ effectively free. Weight--activation (W8A8) schemes and the FP8 E4M3/E5M2
 formats~\cite{micikevicius2022fp8} instead reduce arithmetic cost, which is what
 a compute-bound encoder requires. We use \texttt{torchao}~\cite{torchao} for all
 configurations and PyTorch~2's compiler stack~\cite{ansel2024pytorch2}, whose
-Inductor backend emits Triton~\cite{tillet2019triton} kernels; Section~4.1 shows
+Inductor backend emits Triton~\cite{tillet2019triton} kernels;
+Section~\ref{sec:compile} shows
 that the compile mode, not the quantization scheme, determines whether W8A8 is
 viable at all. Quantization is also load-bearing for parameter-efficient
 fine-tuning~\cite{dettmers2023qlora}, a setting we do not evaluate.
@@ -301,25 +299,15 @@ the latter, we added a fourth metric requiring real experimental data:
 
 Three ProteinGym substitution assays were selected to span the sequence-length
 range, since peak memory during masked-marginals scoring grows with $L$:
-
-\begin{table}[htb]
-\centering
-\caption{ProteinGym assays used. All 19{,}557 single-substitution variants had
-their stated wild-type residue verified against the reference \texttt{target\_seq}
-before use; all matched. This check is load-bearing --- an off-by-one in
-position indexing does not raise an error, it silently scores the wrong
-positions and yields a plausible-looking correlation.}
-\small
-\begin{tabular}{lrrrl}
-\toprule
-Assay & $L$ & Singles & Masked positions & Coverage \\
-\midrule
-\texttt{IF1\_ECOLI\_Kelsic\_2016}     &  72 &  1{,}367 &  72 & 100\% \\
-\texttt{BLAT\_ECOLX\_Stiffler\_2015}  & 286 &  4{,}996 & 263 &  92\% \\
-\texttt{HSP82\_YEAST\_Flynn\_2019}    & 709 & 13{,}194 & 707 & 100\% \\
-\bottomrule
-\end{tabular}
-\end{table}
+\texttt{IF1\_ECOLI\_Kelsic\_2016} ($L = 72$),
+\texttt{BLAT\_ECOLX\_Stiffler\_2015} ($L = 286$) and
+\texttt{HSP82\_YEAST\_Flynn\_2019} ($L = 709$), together 19{,}557
+single-substitution variants over 1042 masked positions
+(Table~\ref{tab:pilotassays}). Every variant's stated wild-type residue was
+verified against the reference \texttt{target\_seq} before use and all matched.
+This check is load-bearing --- an off-by-one in position indexing does not raise
+an error, it silently scores the wrong positions and yields a plausible-looking
+correlation.
 
 \subsection{Full benchmark data}
 
@@ -520,23 +508,11 @@ discussed anywhere in this paper.
 
 \subsection{Hardware and software environment}
 
-\begin{table}[htb]
-\centering
-\caption{Hardware and software environment. The glibc 2.17 ceiling is what forces torch 2.6.0 and rules out the prebuilt bitsandbytes GPU wheels, so NF4 was unavailable and is absent from the configuration list.}
-\small
-\begin{tabular}{ll}
-\toprule
-Component & Detail \\
-\midrule
-GPU (primary)  & NVIDIA H200, 143\,GB, sm\_90 (FP8 tensor cores) \\
-GPU (secondary)& NVIDIA A100, 80\,GB, sm\_80 (no FP8) \\
-Driver         & 550.54.14 \\
-PyTorch        & 2.6.0+cu124 \\
-Attention      & SDPA \\
-Compile mode   & \texttt{max-autotune-no-cudagraphs} \\
-\bottomrule
-\end{tabular}
-\end{table}
+Measurements were taken on an NVIDIA H200 (143\,GB, sm\_90, with FP8 tensor
+cores) under PyTorch 2.6.0+cu124 with SDPA attention, compiled with
+\texttt{max-autotune-no-cudagraphs} where compilation is used at all; an A100
+(80\,GB, sm\_80, no FP8) was used where noted. Table~\ref{tab:env} gives the
+full environment.
 
 The cluster runs CentOS 7.6 with glibc 2.17 on every node, including the H200
 nodes, which forced several choices. PyTorch moved to \texttt{manylinux\_2\_28}
@@ -553,7 +529,26 @@ because its INT8/FP8 paths dispatch to \texttt{torch.\_int\_mm} and
 
 \section{Results}
 
+This section has four parts, and the first two disagree with each other.
+Sections~\ref{sec:compile}--\ref{sec:pilotscale} establish the speed, memory and
+fidelity behaviour of each configuration on the two workloads, taking ground
+truth from three hand-picked assays --- enough to show that an effect exists on
+a particular assay, not enough to generalise from it.
+Section~\ref{sec:full} repeats the accuracy measurement on the complete
+201-assay benchmark at three model scales and overturns two conclusions the
+three-assay pilot supported; each retraction is stated where the original claim
+was made. The remainder diagnoses the one catastrophic failure the full
+benchmark exposes, repairs it, and derives a label-free screen that predicts
+which targets are at risk without experimental data. The last two subsections
+place all of it in a resource envelope and ask whether quantizing a large model
+is ever preferable to running a small one.
+
+A reader interested only in the deployment conclusion can go to
+Table~\ref{tab:tail3} (the per-assay tail, which is the selection criterion we
+argue for) and Table~\ref{tab:pareto} (the cross-scale Pareto surface).
+
 \subsection{Compile mode determines whether W8A8 is viable at all}
+\label{sec:compile}
 
 The single most consequential configuration choice is not the quantization
 scheme but the \texttt{torch.compile} mode. Measured on a single ESM2-3B-shaped
@@ -669,71 +664,23 @@ $L=709$ it costs 20\% throughput for 43\% less memory --- a defensible trade
 that is indefensible at $L=72$.
 
 \subsection{Memory during DMS scoring}
+\label{sec:dmsmem}
 
-\begin{table}[htb]
-\centering
-\caption{Peak device memory during DMS scoring. Weights account for
-approximately 90\% of peak even at $L=709$ (bf16: 5.29\,GB weights against
-0.59\,GB activations).}
-\small
-\begin{tabular}{lrrrr}
-\toprule
-Config & Weights (GB) & Peak $L{=}72$ & Peak $L{=}286$ & Peak $L{=}709$ \\
-\midrule
-\cfg{fp32}      & 10.72 & 10.87 & 11.19 & 11.85 \\
-\cfg{bf16}      &  5.29 &  5.38 &  5.55 &  5.88 \\
-\cfg{int8\_wo}  &  2.66 &  2.77 &  2.92 &  3.25 \\
-\cfg{int8\_dyn} &  2.65 &  2.87 &  2.91 &  3.36 \\
-\cfg{fp8\_dyn}  &  2.65 &  2.76 &  2.96 &  3.35 \\
-\cfg{int4\_wo}  & \best{1.61} & \best{1.70} & \best{1.87} & \best{2.20} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-This is the reverse of the bulk-extraction situation. Masked-marginals scoring
-keeps the batch narrow, so the $O(L^2)$ attention term never dominates and
-weights remain roughly 90\% of peak memory even at $L=709$. Quantization
-therefore addresses almost all of DMS peak memory, and \cfg{int4\_wo} gives the
-smallest footprint at every length --- $2.7\times$ below bf16.
+Peak device memory during DMS scoring is the reverse of the bulk-extraction
+situation (Table~\ref{tab:dmsmem}). Masked-marginals scoring keeps the batch
+narrow, so the $O(L^2)$ attention term never dominates and weights remain
+roughly 90\% of peak memory even at $L=709$ (bf16: 5.29\,GB of weights against
+0.59\,GB of activations). Quantization therefore addresses almost all of DMS
+peak memory, and \cfg{int4\_wo} gives the smallest footprint at every length ---
+$2.7\times$ below bf16.
 
 \subsection{Ground-truth accuracy on ProteinGym}
 \label{sec:gt}
 
-\begin{table}[htb]
-\centering
-\caption{Spearman correlation against experimental measurements, ESM2-3B.
-$\Delta$ is the change from fp32, with a 2000-sample paired bootstrap over
-variants. ``Real'' indicates the 95\% confidence interval excludes zero.}
-\small
-\begin{tabular}{llrrrl}
-\toprule
-Assay & Config & $\rho_{\text{expt}}$ & $\Delta$ vs fp32 & 95\% CI of $\Delta$ & Verdict \\
-\midrule
-IF1        & \cfg{fp32}      & 0.5561 & (ref)    &                      &  \\
-($n{=}1367$)& \cfg{bf16}      & 0.5543 & $-0.0018$ & $[-0.0027, -0.0009]$ & \textbf{real} \\
-           & \cfg{int8\_wo}  & 0.5570 & $+0.0009$ & $[-0.0003, +0.0021]$ & noise \\
-           & \cfg{int8\_dyn} & 0.5504 & $-0.0057$ & $[-0.0124, +0.0013]$ & noise \\
-           & \cfg{fp8\_dyn}  & 0.5584 & $+0.0023$ & $[-0.0022, +0.0067]$ & noise \\
-           & \cfg{int4\_wo}  & 0.5394 & $\mathbf{-0.0167}$ & $[-0.0263, -0.0074]$ & \textbf{real} \\
-\midrule
-BLAT       & \cfg{fp32}      & 0.5893 & (ref)    &                      &  \\
-($n{=}4996$)& \cfg{bf16}      & 0.5896 & $+0.0003$ & $[-0.0003, +0.0009]$ & noise \\
-           & \cfg{int8\_wo}  & 0.5913 & $+0.0019$ & $[+0.0011, +0.0029]$ & \textbf{real} \\
-           & \cfg{int8\_dyn} & 0.6160 & $\mathbf{+0.0266}$ & $[+0.0219, +0.0315]$ & \textbf{real} \\
-           & \cfg{fp8\_dyn}  & 0.6088 & $\mathbf{+0.0194}$ & $[+0.0161, +0.0229]$ & \textbf{real} \\
-           & \cfg{int4\_wo}  & 0.6388 & $\mathbf{+0.0495}$ & $[+0.0433, +0.0561]$ & \textbf{real} \\
-\midrule
-HSP82      & \cfg{fp32}      & 0.2931 & (ref)    &                      &  \\
-($n{=}13194$)& \cfg{bf16}    & 0.2933 & $+0.0002$ & $[-0.0002, +0.0005]$ & noise \\
-           & \cfg{int8\_wo}  & 0.2933 & $+0.0002$ & $[-0.0002, +0.0007]$ & noise \\
-           & \cfg{int8\_dyn} & 0.2937 & $+0.0006$ & $[-0.0020, +0.0028]$ & noise \\
-           & \cfg{fp8\_dyn}  & 0.2944 & $+0.0012$ & $[-0.0003, +0.0027]$ & noise \\
-           & \cfg{int4\_wo}  & 0.2904 & $-0.0027$ & $[-0.0057, +0.0002]$ & noise \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Two findings emerge, and the second qualifies the first.
+Spearman correlation against experimental measurement, with a 2000-sample
+paired bootstrap over variants, is reported for all three assays and six
+configurations at 3B in Table~\ref{tab:pilotacc}. Two findings emerge, and the
+second qualifies the first.
 
 \paragraph{Quantization does not systematically degrade variant-effect
 accuracy.} Of the 15 assay/configuration pairs, 11 shifts are upward. Most are
@@ -767,39 +714,22 @@ which assay to trust is a $2\times$ effect; choosing a quantization
 configuration is a $1\%$ effect.
 
 \subsection{Model-scale consistency}
+\label{sec:pilotscale}
 
 The same three assays were run on ESM2-650M. The qualitative picture holds:
-bf16 fastest, \cfg{int8\_dyn} slowest, ground-truth shifts small. The largest
+bf16 fastest, \cfg{int8\_dyn} slowest, ground-truth shifts small --- the largest
 650M shift was $-0.0063$ (\cfg{int8\_dyn} on IF1) against $\rho_{\text{fp32}}$
-of 0.9954. The larger and more clearly significant shifts at 3B indicate that
-sensitivity to quantization grows with model size, so 650M results should not be
-extrapolated to 3B without checking.
+of 0.9954. The larger and more clearly significant shifts at 3B suggested that
+sensitivity to quantization grows with model size.
 
-An incidental observation deserves note, because it bears directly on how much
-any of this matters. The fp32 650M model correlates with experiment
-\emph{better} than the fp32 3B model on two of the three assays:
+The pilot appeared to say something stronger as well. The fp32 650M model
+correlated with experiment \emph{better} than fp32 3B on two of the three
+assays, and on BLAT by $0.1422$ ($0.7315$ against $0.5893$) --- roughly
+\emph{three times} the largest effect any quantization configuration produced in
+this study. The inference drawn was that model selection dominates precision
+selection by a wide margin.
 
-\begin{table}[htb]
-\centering
-\caption{Ground-truth correlation by model scale on the three-assay subset. The 0.14 BLAT gap prompted the inference that model choice dominates precision choice; Section~\ref{sec:full} shows it does not generalise.}
-\small
-\begin{tabular}{lrrr}
-\toprule
-Assay & 650M $\rho_{\text{expt}}$ & 3B $\rho_{\text{expt}}$ & Difference \\
-\midrule
-IF1   & 0.5987 & 0.5561 & $-0.0426$ \\
-BLAT  & 0.7315 & 0.5893 & $-0.1422$ \\
-HSP82 & 0.2648 & 0.2931 & $+0.0283$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The BLAT gap of $0.14$ is roughly \emph{three times} the largest effect any
-quantization configuration produced in this study. Model selection dominates
-precision selection by a wide margin, and the assumption that the larger
-checkpoint is the more accurate one does not hold uniformly here.
-
-\emph{This inference does not survive Section~\ref{sec:full}.} Over 201 assays
+\emph{That inference does not survive Section~\ref{sec:full}.} Over 201 assays
 the two models are statistically indistinguishable ($p = 0.35$), and adding a
 third scale makes the picture worse for the larger checkpoint rather than
 better: fp32 mean $\rho$ falls monotonically $0.4459 \to 0.4398 \to 0.4323$ from
@@ -2217,6 +2147,111 @@ biology and design.
 \end{thebibliography}
 
 \appendix
+\section{Supporting Tables}
+\label{sec:apptables}
+
+These four tables support claims made in the main text but are not themselves
+part of the argument: two describe the measurement setup, and two give the
+three-assay pilot detail that Section~\ref{sec:full} supersedes.
+
+\begin{table}[htb]
+\centering
+\caption{ProteinGym assays used for the three-assay pilot
+(Sections~\ref{sec:compile}--\ref{sec:pilotscale}). All 19{,}557
+single-substitution variants had their stated wild-type residue verified against
+the reference \texttt{target\_seq} before use; all matched. This check is
+load-bearing --- an off-by-one in position indexing does not raise an error, it
+silently scores the wrong positions and yields a plausible-looking correlation.}
+\label{tab:pilotassays}
+\small
+\begin{tabular}{lrrrl}
+\toprule
+Assay & $L$ & Singles & Masked positions & Coverage \\
+\midrule
+\texttt{IF1\_ECOLI\_Kelsic\_2016}     &  72 &  1{,}367 &  72 & 100\% \\
+\texttt{BLAT\_ECOLX\_Stiffler\_2015}  & 286 &  4{,}996 & 263 &  92\% \\
+\texttt{HSP82\_YEAST\_Flynn\_2019}    & 709 & 13{,}194 & 707 & 100\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htb]
+\centering
+\caption{Hardware and software environment. The glibc 2.17 ceiling is what forces torch 2.6.0 and rules out the prebuilt bitsandbytes GPU wheels, so NF4 was unavailable and is absent from the configuration list.}
+\label{tab:env}
+\small
+\begin{tabular}{ll}
+\toprule
+Component & Detail \\
+\midrule
+GPU (primary)  & NVIDIA H200, 143\,GB, sm\_90 (FP8 tensor cores) \\
+GPU (secondary)& NVIDIA A100, 80\,GB, sm\_80 (no FP8) \\
+Driver         & 550.54.14 \\
+PyTorch        & 2.6.0+cu124 \\
+Attention      & SDPA \\
+Compile mode   & \texttt{max-autotune-no-cudagraphs} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htb]
+\centering
+\caption{Peak device memory during DMS scoring, ESM2-3B, at the three pilot
+assay lengths. Weights account for approximately 90\% of peak even at $L=709$.
+Referenced from Section~\ref{sec:dmsmem}.}
+\label{tab:dmsmem}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Config & Weights (GB) & Peak $L{=}72$ & Peak $L{=}286$ & Peak $L{=}709$ \\
+\midrule
+\cfg{fp32}      & 10.72 & 10.87 & 11.19 & 11.85 \\
+\cfg{bf16}      &  5.29 &  5.38 &  5.55 &  5.88 \\
+\cfg{int8\_wo}  &  2.66 &  2.77 &  2.92 &  3.25 \\
+\cfg{int8\_dyn} &  2.65 &  2.87 &  2.91 &  3.36 \\
+\cfg{fp8\_dyn}  &  2.65 &  2.76 &  2.96 &  3.35 \\
+\cfg{int4\_wo}  & \best{1.61} & \best{1.70} & \best{1.87} & \best{2.20} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htb]
+\centering
+\caption{Three-assay pilot: Spearman correlation against experimental
+measurements, ESM2-3B. $\Delta$ is the change from fp32, with a 2000-sample
+paired bootstrap over variants. ``Real'' indicates the 95\% confidence interval
+excludes zero. Referenced from Section~\ref{sec:gt}; the benchmark-scale
+replacement is Table~\ref{tab:acc3}.}
+\label{tab:pilotacc}
+\small
+\begin{tabular}{llrrrl}
+\toprule
+Assay & Config & $\rho_{\text{expt}}$ & $\Delta$ vs fp32 & 95\% CI of $\Delta$ & Verdict \\
+\midrule
+IF1        & \cfg{fp32}      & 0.5561 & (ref)    &                      &  \\
+($n{=}1367$)& \cfg{bf16}      & 0.5543 & $-0.0018$ & $[-0.0027, -0.0009]$ & \textbf{real} \\
+           & \cfg{int8\_wo}  & 0.5570 & $+0.0009$ & $[-0.0003, +0.0021]$ & noise \\
+           & \cfg{int8\_dyn} & 0.5504 & $-0.0057$ & $[-0.0124, +0.0013]$ & noise \\
+           & \cfg{fp8\_dyn}  & 0.5584 & $+0.0023$ & $[-0.0022, +0.0067]$ & noise \\
+           & \cfg{int4\_wo}  & 0.5394 & $\mathbf{-0.0167}$ & $[-0.0263, -0.0074]$ & \textbf{real} \\
+\midrule
+BLAT       & \cfg{fp32}      & 0.5893 & (ref)    &                      &  \\
+($n{=}4996$)& \cfg{bf16}      & 0.5896 & $+0.0003$ & $[-0.0003, +0.0009]$ & noise \\
+           & \cfg{int8\_wo}  & 0.5913 & $+0.0019$ & $[+0.0011, +0.0029]$ & \textbf{real} \\
+           & \cfg{int8\_dyn} & 0.6160 & $\mathbf{+0.0266}$ & $[+0.0219, +0.0315]$ & \textbf{real} \\
+           & \cfg{fp8\_dyn}  & 0.6088 & $\mathbf{+0.0194}$ & $[+0.0161, +0.0229]$ & \textbf{real} \\
+           & \cfg{int4\_wo}  & 0.6388 & $\mathbf{+0.0495}$ & $[+0.0433, +0.0561]$ & \textbf{real} \\
+\midrule
+HSP82      & \cfg{fp32}      & 0.2931 & (ref)    &                      &  \\
+($n{=}13194$)& \cfg{bf16}    & 0.2933 & $+0.0002$ & $[-0.0002, +0.0005]$ & noise \\
+           & \cfg{int8\_wo}  & 0.2933 & $+0.0002$ & $[-0.0002, +0.0007]$ & noise \\
+           & \cfg{int8\_dyn} & 0.2937 & $+0.0006$ & $[-0.0020, +0.0028]$ & noise \\
+           & \cfg{fp8\_dyn}  & 0.2944 & $+0.0012$ & $[-0.0003, +0.0027]$ & noise \\
+           & \cfg{int4\_wo}  & 0.2904 & $-0.0027$ & $[-0.0057, +0.0002]$ & noise \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{Reproduction}
 
 \begin{footnotesize}
@@ -2250,10 +2285,37 @@ sbatch --array=0-5 -p H8V141_SAP112M2000_L --mem=200G \
     slurm/run_proteingym.sbatch 3B
 sbatch --array=0-5 -p H8V141_SAP112M2000_L --mem=200G \
     slurm/run_proteingym.sbatch 650M
+# 15B needs the H200 (fp32 weights alone are ~57 GB), more memory,
+# and more wall time -- int4_wo alone is 5.5 h.
+sbatch --array=0-5 -p H8V141_SAP112M2000_L --mem=300G --time=12:00:00 \
+    slurm/run_proteingym.sbatch 15B
+
+# The two W8A8 repairs: asymmetric activations, and SmoothQuant with
+# 16 calibration sequences.
+sbatch --array=0-1 -p H8V141_SAP112M2000_L --mem=200G \
+    slurm/run_proteingym.sbatch 3B int8_dyn_asym,int8_dyn_sq
 
 # Benchmark-wide accuracy / speed / RAM + protein-clustered bootstrap
 python src/aggregate_proteingym.py --model 3B
 python src/aggregate_proteingym.py --model 650M
+python src/aggregate_proteingym.py --model 15B
+
+# --- Analyses reported in the paper -----------------------------------
+# Pareto surface, interaction contrasts, conditioned tail, aggregation
+# conventions with post-stratification, and the SNR screen
+python src/analyze_scales.py
+
+# W8A8 repair, per assay -> results/proteingym/w8a8_remedies.csv
+python src/analyze_w8a8.py
+
+# Repeatability floor: rep2 against the primary run, bitwise
+python src/analyze_repeat.py
+
+# Per-channel activation profile of the collapsing assay vs controls
+sbatch -p H8V141_SAP112M2000_L --mem=200G slurm/run_outliers.sbatch
+
+# All seven figures
+python src/figures.py
 \end{verbatim}
 \end{footnotesize}
 
