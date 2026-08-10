@@ -1743,6 +1743,48 @@ do. On that criterion \cfg{bf16} and \cfg{int8\_wo} are safe (no assay beyond
 $0.018$ across 402 assay/model pairs), \cfg{fp8\_dyn} is nearly so ($0.034$), and
 \cfg{int8\_dyn} and \cfg{int4\_wo} are not.
 
+\subsection{Does the repair undercut the argument?}
+
+An objection follows directly from Section~\ref{sec:w8a8fix}, and we think it is
+the strongest one available against this paper. The failure that motivates the
+whole mean-versus-tail argument turns out to be repairable by a keyword
+argument. So did the tail analysis discover a property of quantization, or
+merely a configuration bug that a careful practitioner would have found by
+trying the other activation mapping? On that reading the title promises
+something the paper does not deliver: what benchmark averages concealed was an
+implementation defect, not a failure that matters.
+
+Three things are worth separating in reply.
+
+First, \textbf{the repair is only reachable through the tail}. Nobody switches
+an activation mapping that shows no symptom, and \cfg{int8\_dyn} shows none in
+the statistic that would normally be reported: its benchmark mean is
+$-0.0021$ with $p = 0.34$, indistinguishable from fp32, and it stays
+indistinguishable after the repair. A study reporting means would have shipped
+the broken configuration as safe, and would have had no reason to look for a
+fix. That the defect turned out to be cheap to correct once seen is an argument
+for looking, not against it.
+
+Second, \textbf{not every tail is a bug}. \cfg{int4\_wo} damages 4, 5 and 2 of
+the $\sim$157 signal-carrying assays by more than $0.05$ at 650M, 3B and 15B
+respectively, with worst cases of $-0.050$, $-0.056$ and $-0.047$ --- a tail
+present at every scale we measured. We know of no analogous one-line repair for it, and its damage is
+distributed across assays and scales rather than concentrated in a single
+collapse. The two configurations therefore fail in different ways --- one
+sharply and repairably, one broadly and persistently --- and the benchmark mean
+is equally blind to both. Had \cfg{int8\_dyn} been the only case, the objection
+would carry more weight than it does.
+
+Third, and conceding the substance of it: \textbf{the mean cannot tell you which
+kind of failure you have}. It reports that a configuration is safe on average
+over targets; it cannot distinguish a repairable defect from an intrinsic limit,
+because it does not surface either. The honest form of our claim is therefore
+narrower than the title alone suggests. Benchmark averages conceal
+\emph{heterogeneity}, and whether a particular instance of heterogeneity is a
+bug worth fixing or a property worth avoiding is a second question, which the
+tail statistics raise and do not answer. We would rather state the claim at that
+strength than defend the stronger one.
+
 \subsection{Recommendations}
 
 \begin{table}[htb]
