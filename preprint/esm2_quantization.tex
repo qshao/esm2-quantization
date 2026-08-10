@@ -593,8 +593,11 @@ kernel-selection effect rather than a Dynamo fallback.
 \centering
 \caption{ESM2-3B, H200, compiled with \texttt{max-autotune-no-cudagraphs}, SDPA
 attention, 64 sequences of length 512--1024 under a 16{,}384-token budget.
-Reproduced across four independent jobs: bf16 mean 56{,}642 residues/s, range
-55{,}941--57{,}422 ($\pm 1.3\%$); fp32 mean 6{,}742, range 6{,}687--6{,}814.}
+Reproduced across five independent jobs: bf16 mean 56{,}789 residues/s, range
+55{,}941--57{,}422 ($\pm 1.3\%$); fp32 mean 6{,}752, range 6{,}687--6{,}814. The
+\cfg{int8\_dyn\_asym} row comes from the fifth of those jobs, run at identical
+settings; its bf16 (57{,}377 residues/s) and \cfg{int8\_dyn} (60{,}023) fall
+inside the ranges above, so the rows are comparable.}
 \label{tab:bulk}
 \small
 \begin{tabular}{lrrrrrrr}
@@ -606,6 +609,7 @@ Config & Weights & Peak & Residues/s & vs bf16 & Emb.\ cos & Logit KL & DMS $\rh
 \cfg{bf16}        &  5.29 & 12.63 & 57{,}057 & 1.00$\times$ & 0.999949 & 1.17e--04 & 0.9998 \\
 \cfg{int8\_wo}    &  2.66 &  8.48 & 54{,}816 & 0.96$\times$ & 0.999959 & 1.05e--04 & 0.9998 \\
 \cfg{int8\_dyn}   &  2.65 & \best{7.07} & 59{,}996 & 1.05$\times$ & 0.989592 & 1.40e--02 & 0.9928 \\
+\cfg{int8\_dyn\_asym} & 2.65 &  7.26 & 51{,}383 & 0.90$\times$ & 0.999469 & 1.41e--03 & 0.9972 \\
 \cfg{fp8\_dyn}    &  2.65 &  7.24 & \best{65{,}376} & \best{1.15$\times$} & 0.999920 & 4.60e--04 & 0.9988 \\
 \cfg{int4\_wo}    & \best{1.61} &  7.69 &  3{,}813 & 0.07$\times$ & 0.998904 & 1.89e--03 & 0.9975 \\
 \bottomrule
@@ -1316,57 +1320,35 @@ though we have not isolated it.
 The asymmetric variant was adopted above on DMS evidence, where it is both more
 accurate and $1.95\times$ faster than symmetric. Applying that conclusion to
 bulk embedding without measuring it would repeat the error this paper is about,
-so we measured it (Table~\ref{tab:asymbulk}).
+so we measured it at the settings of Table~\ref{tab:bulk}, where it appears as
+its own row.
 
-\begin{table}[htb]
-\centering
-\caption{Bulk embedding extraction at 3B on an H200 under
-\texttt{max-autotune}, all configurations from a single run so the comparison is
-internal. Settings differ from Table~\ref{tab:bulk} (32 sequences at 13.1\%
-padding waste rather than 64 at 0\%), so the absolute rates are not comparable
-across the two tables; the ratios within this one are. \cfg{int8\_dyn\_asym}
-recovers almost all of the fidelity that symmetric scaling loses --- embedding
-cosine $0.9906 \to 0.9993$ --- but is $14$\% \emph{slower} than symmetric here,
-having been $95$\% faster on DMS.}
-\label{tab:asymbulk}
-\small
-\begin{tabular}{lrrrrr}
-\toprule
-Config & residues/s & vs bf16 & peak GB & emb.\ cos & DMS $\rho_{\text{fp32}}$ \\
-\midrule
-\cfg{fp32}            &  5{,}775 & 0.12$\times$ & 19.90 & ---      & --- \\
-\cfg{bf16}            & 48{,}459 & 1.00$\times$ &  8.92 & 0.999933 & 0.9998 \\
-\cfg{int8\_wo}        & 46{,}434 & 0.96$\times$ &  6.34 & 0.999865 & 0.9998 \\
-\cfg{int8\_dyn}       & 49{,}871 & 1.03$\times$ &  5.43 & 0.990609 & 0.9928 \\
-\cfg{int8\_dyn\_asym} & 42{,}659 & 0.88$\times$ &  5.58 & 0.999276 & 0.9972 \\
-\cfg{fp8\_dyn}        & \textbf{54{,}198} & \textbf{1.12$\times$} &  5.54 & 0.999162 & 0.9988 \\
-\bottomrule
-\end{tabular}
-\end{table}
+The \emph{accuracy} repair transfers. Embedding cosine rises from $0.9896$ under
+symmetric scaling to $0.9995$, logit KL falls from $1.4\times10^{-2}$ to
+$1.4\times10^{-3}$, and DMS $\rho_{\text{fp32}}$ from $0.9928$ to $0.9972$.
+Whatever symmetric scaling is doing wrong, it is not specific to the
+masked-marginals input distribution.
 
-Two consequences, and the second corrects a recommendation we made on the
-strength of the DMS result alone.
+The \emph{speed} effect reverses. Asymmetric runs at $0.90\times$ bf16 against
+symmetric's $1.05\times$ --- a $14$\% throughput loss --- having been
+$1.95\times$ \emph{faster} than symmetric on DMS scoring. The same one-keyword
+change is a large speed win on one workload and a moderate loss on the other,
+which is the workload-dependence of this paper's central claim reappearing
+inside a single configuration.
 
-The \emph{accuracy} repair transfers: embedding cosine goes from $0.9906$ under
-symmetric scaling to $0.9993$ under asymmetric, and DMS $\rho_{\text{fp32}}$
-from $0.9928$ to $0.9972$. Whatever symmetric scaling is doing wrong, it is not
-specific to the masked-marginals input distribution.
+The practical consequence corrects a recommendation we made from the DMS result
+alone. For bulk extraction on hardware without FP8, \textbf{\cfg{int8\_wo} beats
+the asymmetric variant on both axes that matter there}: faster ($0.96\times$
+against $0.90\times$) and more faithful (embedding cosine $0.999956$ against
+$0.999469$), at $1.22$\,GB more peak memory. Asymmetric \cfg{int8\_dyn} is worth
+its throughput cost only where the memory is needed and FP8 is unavailable.
 
-The \emph{speed} effect reverses. Asymmetric is $1.95\times$ faster than
-symmetric on DMS and $0.85\times$ its speed on bulk extraction. It is therefore
-not the right choice for bulk embedding on hardware without FP8:
-\textbf{\cfg{int8\_wo} beats it on both axes that matter there}, being faster
-($0.96\times$ against $0.88\times$ bf16) and more faithful (embedding cosine
-$0.999865$ against $0.999276$), at $0.76$\,GB more peak memory. Our
-recommendation table previously said otherwise, on DMS evidence extrapolated to
-a workload where it does not hold.
-
-We were unable to obtain the corresponding A100 measurement --- the partition
+We were unable to obtain the corresponding A100 measurement --- that partition
 was occupied by a multi-day job for the duration of this revision --- so the
-ranking above is established on H200 and the A100-specific bulk numbers for the
-asymmetric variant remain unmeasured. We state the recommendation for
-FP8-less hardware as an inference from the H200 ordering rather than as a
-measurement, and mark it as such in Table~\ref{tab:recs}.
+ordering above is established on H200 and the A100-specific numbers remain
+unmeasured. The recommendation for FP8-less hardware is stated as an inference
+from this ordering rather than as a measurement, and marked as such in
+Table~\ref{tab:recs}.
 
 \subsubsection*{A label-free screen for which assays are at risk}
 \label{sec:snr}
@@ -1415,6 +1397,39 @@ without being told it, which is a check that the quantity measures what it is
 supposed to.}
 \label{fig:snr}
 \end{figure}
+
+The obvious objection is that SNR simply re-discovers the configuration
+ranking --- median SNR runs from $47.9$ for \cfg{bf16} down to $5.7$ for
+\cfg{int4\_wo} --- in which case the bins are sorting configurations, not
+targets, and the screen says nothing that choosing \cfg{bf16} would not. It does
+not. Holding the configuration fixed, SNR still predicts damage within it
+(Table~\ref{tab:snrwithin}), and within \cfg{int4\_wo} alone --- the
+configuration with the broadest tail --- the probability of losing more than
+$0.05$ Spearman falls from $10.5$\% below $\mathrm{SNR}=4$ to $1.6$\% between 4
+and 8 and to $0.0$\% above 8 (95, 367 and 141 assay/scale combinations
+respectively). The quantity therefore carries per-target information, which is
+what a screen has to do to be worth running.
+
+\begin{table}[htb]
+\centering
+\caption{SNR against damage \emph{within} each configuration. If the screen
+merely recovered the aggressiveness ordering these correlations would be near
+zero; they are not. The negative sign is the expected direction: more signal
+relative to perturbation, less damage.}
+\label{tab:snrwithin}
+\small
+\begin{tabular}{lrr}
+\toprule
+Config & median SNR & Spearman(SNR, $|\Delta\rho|$) within config \\
+\midrule
+\cfg{bf16}      & 47.9 & $-0.425$ \\
+\cfg{int8\_wo}  & 34.6 & $-0.404$ \\
+\cfg{fp8\_dyn}  & 11.9 & $-0.264$ \\
+\cfg{int8\_dyn} & 10.1 & $-0.386$ \\
+\cfg{int4\_wo}  &  5.7 & $-0.389$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 This is a better screen than the raw drift test in Algorithm~\ref{alg:select},
 because it is calibrated: $\rho_{\text{fp32}}$ bounds how far an answer can move
@@ -1796,7 +1811,7 @@ a 650M one for this workload. Two rows were wrong in earlier drafts and are
 corrected here on measured evidence: 3B/\cfg{int4\_wo} for minimum memory (it
 uses more memory than 650M/\cfg{bf16}, is less accurate and is $20\times$
 slower), and asymmetric \cfg{int8\_dyn} for FP8-less bulk extraction (it is
-slower \emph{and} less faithful than \cfg{int8\_wo} there, Table~\ref{tab:asymbulk}).}
+slower \emph{and} less faithful than \cfg{int8\_wo} there, Table~\ref{tab:bulk}).}
 \label{tab:recs}
 \small
 \begin{tabular}{lll}
@@ -1822,7 +1837,7 @@ V100 / sm\_70          & any        & Quantization buys memory only, never speed
 
 \vspace{3pt}
 {\footnotesize $^\dagger$ Inferred from the H200 ordering in
-Table~\ref{tab:asymbulk}. The A100 partition was occupied by a multi-day job
+Table~\ref{tab:bulk}. The A100 partition was occupied by a multi-day job
 for the duration of this revision, so the A100-specific bulk numbers are
 unmeasured.}
 \end{table}

@@ -794,6 +794,33 @@
     "msa_low_frac": 0.5,
     "stability_frac": 0.0
   },
+  "snr_within_config": [
+    {
+      "config": "bf16",
+      "median_snr": 47.85645041631227,
+      "spearman_within": -0.4253636239584539
+    },
+    {
+      "config": "int8_wo",
+      "median_snr": 34.553319176695894,
+      "spearman_within": -0.4035524462706953
+    },
+    {
+      "config": "fp8_dyn",
+      "median_snr": 11.86901589817119,
+      "spearman_within": -0.26396645875724173
+    },
+    {
+      "config": "int8_dyn",
+      "median_snr": 10.10642278797033,
+      "spearman_within": -0.3857538737637925
+    },
+    {
+      "config": "int4_wo",
+      "median_snr": 5.7411735407746995,
+      "spearman_within": -0.389489049265225
+    }
+  ],
   "snr_screen": {
     "bins": [
       {

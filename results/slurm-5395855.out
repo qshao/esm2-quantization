@@ -1,0 +1,108 @@
+=== node: ghnode002 ===
+NVIDIA H200, 143771 MiB, 550.54.14
+torch 2.6.0+cu124 | cc (9, 0)
+
+[setup] device=cuda model=3B attn=sdpa
+[setup] 64 sequences -> 3 bucketed batches, padding waste 0.0% (naive fixed-size would be 25.0%)
+[setup] DMS: 200 variants over 11 masked positions (WT length 40)
+
+=== fp32 ===
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.05s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.43s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.82s/it]
+  weights 10.718 GB | peak 25.369 GB | 6792.9 res/s
+
+=== bf16 ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:25<00:25, 25.49s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:28<00:00, 12.41s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:28<00:00, 14.38s/it]
+  weights 5.288 GB | peak 12.635 GB | 57377.0 res/s
+  emb cos 0.999896 | logit KL 7.580e-04
+  DMS spearman vs fp32 0.9998 | max drift 0.035
+
+=== int8_wo ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.59s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:09<00:00,  4.33s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:09<00:00,  4.52s/it]
+[quant] int8_wo: applied torchao to 216 encoder Linears
+  weights 2.659 GB | peak 8.481 GB | 55339.7 res/s
+  emb cos 0.999956 | logit KL 1.892e-04
+  DMS spearman vs fp32 0.9998 | max drift 0.082
+
+=== int8_dyn ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.55s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:08<00:00,  4.14s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:08<00:00,  4.35s/it]
+[quant] int8_dyn: applied torchao to 216 encoder Linears
+  weights 2.653 GB | peak 7.065 GB | 60023.4 res/s
+  emb cos 0.988777 | logit KL 1.592e-02
+  DMS spearman vs fp32 0.9928 | max drift 0.227
+
+=== int8_dyn_asym ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:25<00:25, 25.96s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:29<00:00, 12.60s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:29<00:00, 14.60s/it]
+[quant] int8_dyn_asym: applied torchao to 216 encoder Linears
+AUTOTUNE addmm(18432x2560, 18432x2560, 2560x2560)
+  bias_addmm 0.3348 ms 100.0% 
+  triton_mm_36 0.3882 ms 86.2% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=64, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  addmm 0.4137 ms 80.9% 
+  triton_mm_37 0.4207 ms 79.6% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=64, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=5, num_warps=8
+  triton_mm_35 0.4667 ms 71.7% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_30 0.5273 ms 63.5% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=64, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_31 0.5425 ms 61.7% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=128, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=4
+  triton_mm_28 0.5887 ms 56.9% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_29 0.6008 ms 55.7% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+  triton_mm_33 0.6127 ms 54.6% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+SingleProcess AUTOTUNE benchmarking takes 2.9226 seconds and 0.0022 seconds precompiling for 21 choices
+AUTOTUNE mm(18432x2560, 2560x10240)
+  mm 1.4398 ms 100.0% 
+  triton_mm_93 1.6531 ms 87.1% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=64, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_92 1.7516 ms 82.2% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_94 1.7593 ms 81.8% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=64, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=5, num_warps=8
+  triton_mm_88 2.1207 ms 67.9% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=128, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=4
+  triton_mm_87 2.3438 ms 61.4% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=64, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_89 2.4208 ms 59.5% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_90 2.4391 ms 59.0% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+  triton_mm_85 2.5827 ms 55.7% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_86 2.6860 ms 53.6% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+SingleProcess AUTOTUNE benchmarking takes 3.0705 seconds and 0.0020 seconds precompiling for 20 choices
+AUTOTUNE mm(18432x10240, 10240x2560)
+  mm 1.4670 ms 100.0% 
+  triton_mm_112 1.5434 ms 95.1% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=64, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_113 1.6761 ms 87.5% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=64, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=5, num_warps=8
+  triton_mm_111 1.7382 ms 84.4% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_107 1.9006 ms 77.2% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=128, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=4
+  triton_mm_106 2.2982 ms 63.8% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=64, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_108 2.5682 ms 57.1% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_109 2.5879 ms 56.7% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=128, BLOCK_N=64, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+  triton_mm_104 2.5931 ms 56.6% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=3, num_warps=4
+  triton_mm_105 2.6318 ms 55.7% ACC_TYPE='tl.float32', ALLOW_TF32=True, BLOCK_K=32, BLOCK_M=64, BLOCK_N=128, B_PROLOGUE_CAST_TYPE=None, EVEN_K=True, GROUP_M=8, num_stages=4, num_warps=8
+SingleProcess AUTOTUNE benchmarking takes 3.0985 seconds and 0.0021 seconds precompiling for 20 choices
+  weights 2.653 GB | peak 7.259 GB | 51383.1 res/s
+  emb cos 0.999469 | logit KL 1.410e-03
+  DMS spearman vs fp32 0.9972 | max drift 0.179
+
+=== fp8_dyn ===
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:30<00:30, 30.06s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:33<00:00, 14.62s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:33<00:00, 16.94s/it]
+[quant] fp8_dyn: applied torchao to 216 encoder Linears
+  weights 2.654 GB | peak 7.242 GB | 65997.5 res/s
+  emb cos 0.999797 | logit KL 9.835e-04
+  DMS spearman vs fp32 0.9988 | max drift 0.154
+[done] wrote results/matrix_3B_5395855_scores.json (200 variants x 6 configs)
+
+[done] wrote results/matrix_3B_5395855.json
+
+==============================================================================
+config        wGB  peakGB      res/s  speedup    embcos   DMSrho
+------------------------------------------------------------------------------
+fp32        10.72   25.37     6792.9    0.12x       nan      nan
+bf16         5.29   12.63    57377.0    1.00x  0.999896   0.9998
+int8_wo      2.66    8.48    55339.7    0.96x  0.999956   0.9998
+int8_dyn     2.65    7.07    60023.4    1.05x  0.988777   0.9928
+int8_dyn_asym   2.65    7.26    51383.1    0.90x  0.999469   0.9972
+fp8_dyn      2.65    7.24    65997.5    1.15x  0.999797   0.9988
+==============================================================================
+
+==============================================================================
+DMS workload: accuracy / speed / RAM
+config        wGB  peakGB     var/s     sec  rho_fp32  rho_expt
+------------------------------------------------------------------------------
+fp32        10.72   10.84    2028.9    0.10     (ref)       nan
+bf16         5.29    5.36    7386.1    0.03    0.9998       nan
+int8_wo      2.66    2.76    5624.6    0.04    0.9998       nan
+int8_dyn     2.65    2.85     527.4    0.38    0.9928       nan
+int8_dyn_asym   2.65    2.81    1530.8    0.13    0.9972       nan
+fp8_dyn      2.65    2.74    2158.8    0.09    0.9988       nan
+==============================================================================

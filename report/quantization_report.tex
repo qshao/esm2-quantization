@@ -369,8 +369,10 @@ kernel-selection effect rather than a Dynamo fallback.
 \centering
 \caption{ESM2-3B, H200, compiled with \texttt{max-autotune-no-cudagraphs}, SDPA
 attention, 64 sequences of length 512--1024 under a 16{,}384-token budget.
-Reproduced across four independent jobs: bf16 mean 56{,}642 residues/s, range
-55{,}941--57{,}422 ($\pm 1.3\%$); fp32 mean 6{,}742, range 6{,}687--6{,}814.}
+Reproduced across five independent jobs: bf16 mean 56{,}789 residues/s, range
+55{,}941--57{,}422 ($\pm 1.3\%$); fp32 mean 6{,}752, range 6{,}687--6{,}814. The
+\cfg{int8\_dyn\_asym} row is from the fifth job at identical settings, whose
+bf16 (57{,}377) and \cfg{int8\_dyn} (60{,}023) fall inside those ranges.}
 \small
 \begin{tabular}{lrrrrrrr}
 \toprule
@@ -381,6 +383,7 @@ Config & Weights & Peak & Residues/s & vs bf16 & Emb.\ cos & Logit KL & DMS $\rh
 \cfg{bf16}        &  5.29 & 12.63 & 57{,}057 & 1.00$\times$ & 0.999949 & 1.17e--04 & 0.9998 \\
 \cfg{int8\_wo}    &  2.66 &  8.48 & 54{,}816 & 0.96$\times$ & 0.999959 & 1.05e--04 & 0.9998 \\
 \cfg{int8\_dyn}   &  2.65 & \best{7.07} & 59{,}996 & 1.05$\times$ & 0.989592 & 1.40e--02 & 0.9928 \\
+\cfg{int8\_dyn\_asym} & 2.65 &  7.26 & 51{,}383 & 0.90$\times$ & 0.999469 & 1.41e--03 & 0.9972 \\
 \cfg{fp8\_dyn}    &  2.65 &  7.24 & \best{65{,}376} & \best{1.15$\times$} & 0.999920 & 4.60e--04 & 0.9988 \\
 \cfg{int4\_wo}    & \best{1.61} &  7.69 &  3{,}813 & 0.07$\times$ & 0.998904 & 1.89e--03 & 0.9975 \\
 \bottomrule
@@ -945,6 +948,14 @@ $> 8$    & 2233 & 0.0019 &  \textbf{0.0\%} & $-0.0409$ \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+SNR is not merely re-discovering the configuration ranking. Median SNR runs from
+$47.9$ (\cfg{bf16}) to $5.7$ (\cfg{int4\_wo}), but holding the configuration
+fixed it still predicts damage within it --- Spearman $-0.43$, $-0.40$, $-0.26$,
+$-0.39$, $-0.39$ for \cfg{bf16}, \cfg{int8\_wo}, \cfg{fp8\_dyn},
+\cfg{int8\_dyn}, \cfg{int4\_wo}. Within \cfg{int4\_wo} alone the probability of
+losing more than $0.05$ falls $10.5\% \to 1.6\% \to 0.0\%$ across
+$\mathrm{SNR} < 4$, $4$--$8$, $>8$. It carries per-target information.
 
 Reproduce with \texttt{python src/analyze\_scales.py} (section 5) and
 \texttt{src/diag\_outliers.py}.

@@ -310,12 +310,36 @@ def main():
                      "worst": float(g.delta.min())})
         print(f"   {lab:10s} {len(g):6d} {g.delta.abs().median():12.4f} "
               f"{(g.delta.abs() > 0.05).mean():12.1%} {g.delta.min():10.4f}")
+    # The obvious objection: SNR correlates with configuration aggressiveness,
+    # so the bins may be sorting CONFIGS rather than TARGETS -- in which case
+    # the screen tells you nothing that picking bf16 would not. Test it by
+    # holding the configuration fixed.
+    print(f"\n   within-configuration, i.e. does it carry per-TARGET information?")
+    print(f"   {'config':10s} {'median SNR':>11s} {'spearman(SNR,|d|)':>19s}")
+    from scipy.stats import spearmanr
+    within = []
+    for c in CFGS:
+        g = R[R.config == c]
+        rho = float(spearmanr(g.snr, g.delta.abs()).statistic)
+        within.append({"config": c, "median_snr": float(g.snr.median()),
+                       "spearman_within": rho})
+        print(f"   {c:10s} {g.snr.median():11.1f} {rho:19.3f}")
+    g = R[R.config == "int4_wo"]
+    print(f"\n   int4_wo alone (broadest tail), by SNR bin:")
+    for lo, hi, lab in [(0, 4, "< 4"), (4, 8, "4-8"), (8, np.inf, "> 8")]:
+        sub = g[(g.snr >= lo) & (g.snr < hi)]
+        if len(sub):
+            print(f"     {lab:5s} n={len(sub):4d}  median|d|={sub.delta.abs().median():.4f}"
+                  f"  P(|d|>0.05)={(sub.delta.abs() > 0.05).mean():.1%}")
+    out["snr_within_config"] = within
+
     dmg = R[R.delta.abs() > 0.05]
     print(f"\n   Every collapse beyond 0.10 has SNR < 1.7. Of {len(dmg)} pairs damaged "
           f"beyond 0.05, {(dmg.snr < 4).sum()} have SNR < 4;")
     print(f"   SNR > 8 flags none of {int((R.snr > 8).sum())} pairs as damaged, so it "
           f"functions as an all-clear rather than a precise predictor.")
     out["snr_screen"] = {"bins": bins, "n_pairs": len(R)}
+
     R.to_csv(os.path.join(ROOT, "results", "proteingym", "snr_screen.csv"), index=False)
 
     with open(os.path.join(ROOT, args.out), "w") as fh:
