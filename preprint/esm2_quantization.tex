@@ -17,6 +17,12 @@
 \newcommand{\best}[1]{\textbf{#1}}
 \captionsetup{font=small}
 
+% Long unbreakable tokens -- assay/configuration, \texttt{torch.compile},
+% max-autotune-no-cudagraphs -- have no break point, so TeX would rather
+% overflow the right margin than stretch a line. Let it stretch instead:
+% margin overflow is a visible defect, a slightly loose line is not.
+\setlength{\emergencystretch}{3em}
+
 \title{\textbf{Benchmark Averages Hide the Failures That Matter:\\
 Quantizing ESM-2 for Protein Variant-Effect Prediction}}
 
@@ -109,9 +115,10 @@ This paper addresses three questions:
         worst-case single-assay drift, not the mean, is the selection criterion,
         and give a label-free protocol for measuring it on a target
         (Algorithm~\ref{alg:select}).
-  \item A quantitative characterisation of what drift-from-fp32 metrics buy:
-        over 3015 assay/configuration pairs they predict the magnitude of
-        ground-truth change ($r = 0.56$--$0.81$) but not its direction. The
+  \item A quantitative characterisation of what drift-from-fp32 metrics buy.
+        Over 3015 assay/configuration pairs they predict the magnitude of
+        ground-truth change ($r$ between $0.56$ and $0.81$) but not its
+        direction. The
         direction does not merely vary --- INT4 quantization is significantly
         harmful at 650M, significantly beneficial at 3B, and null at 15B, so
         there is no trend in scale to extrapolate either.
@@ -188,8 +195,8 @@ fine-tuning~\cite{dettmers2023qlora}, a setting we do not evaluate.
 \paragraph{Positioning.} Quantization studies for protein language models are
 comparatively rare, and where accuracy is reported it is typically drift against
 the full-precision model on a small probe set. Our contribution is to replace
-that proxy with the full downstream benchmark at two model scales, and to show
-that the proxy is a valid risk bound but an invalid quality ranking.
+that proxy with the full downstream benchmark at three model scales, and to
+show that the proxy is a valid risk bound but an invalid quality ranking.
 
 \section{Experimental Design}
 
@@ -554,10 +561,10 @@ argue for) and Table~\ref{tab:pareto} (the cross-scale Pareto surface).
 \subsection{Compile mode determines whether W8A8 is viable at all}
 \label{sec:compile}
 
-The single most consequential configuration choice is not the quantization
-scheme but the \texttt{torch.compile} mode. Measured on a single ESM2-3B-shaped
-feed-forward block, $2560 \to 10240 \to 2560$, at batch $32 \times 512$ on an
-A100:
+The most consequential configuration choice here is not the quantization
+scheme at all: it is the \texttt{torch.compile} mode. We measured a single
+ESM2-3B-shaped feed-forward block ($2560 \to 10240 \to 2560$) on an A100, at a
+batch of $32 \times 512$:
 
 \begin{table}[htb]
 \centering
@@ -777,6 +784,7 @@ merely vary in size, it has no consistent sign and no monotone trend in scale.
 fp32 mean $\rho$ is $0.4459$, $0.4398$ and $0.4323$ respectively.}
 \label{tab:acc3}
 \small
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrlrlrl}
 \toprule
 & \multicolumn{2}{c}{ESM2-650M} & \multicolumn{2}{c}{ESM2-3B} & \multicolumn{2}{c}{ESM2-15B} \\
@@ -1056,7 +1064,7 @@ stated because the choice can exceed the effect being reported. That applies to
 speed at least as sharply as to accuracy. Averaging the 201 per-assay rates
 answers ``how much slower on a typical assay''; dividing total positions by
 total seconds answers ``how much longer does the job take''. For four of the
-five configurations the two agree to within $0.09$, and for \cfg{fp8\_dyn} they
+five configurations the two agree to within $0.10$, and for \cfg{fp8\_dyn} they
 differ by up to $1.7\times$ --- $0.50$ against $0.30$ at 650M. The gap is not
 noise but the mechanism restated: \cfg{fp8\_dyn}'s per-assay ratio at 3B rises
 from $0.27$ on the shortest quartile of assays to $0.77$ on the longest, so an

@@ -34,6 +34,78 @@ COL = {"fp32": "#000000", "bf16": "#0072B2", "int8_wo": "#009E73",
 LBL = {"int8_wo": "int8_wo", "int8_dyn": "int8_dyn", "fp8_dyn": "fp8_dyn",
        "int4_wo": "int4_wo", "bf16": "bf16", "fp32": "fp32"}
 
+_AUDIT = []          # (figure, message) for everything the layout audit finds
+
+
+# --------------------------------------------------------------------------
+# Layout audit.
+#
+# Two defects have shipped in this figure set and neither is visible at
+# thumbnail size: a legend wider than its axes, which silently overprints the
+# NEXT panel's y-label, and a value label sitting on the curve it annotates.
+# Checking by eye does not scale to seven figures times three revisions, so the
+# check runs on every build and prints what it finds.
+# --------------------------------------------------------------------------
+def _plotted_points(ax, n_interp=220):
+    """Every drawn datum in display coordinates. Line paths are densified --
+    a text box can straddle a segment without containing either endpoint."""
+    out = []
+    for coll in ax.collections:
+        off = coll.get_offsets()
+        if off is not None and len(off):
+            out.append(ax.transData.transform(np.asarray(off)))
+    for ln in ax.lines:
+        x, y = np.asarray(ln.get_xdata(), float), np.asarray(ln.get_ydata(), float)
+        if len(x) < 2:
+            continue
+        t = np.linspace(0, 1, len(x))
+        ti = np.linspace(0, 1, n_interp)
+        out.append(ax.transData.transform(
+            np.column_stack([np.interp(ti, t, x), np.interp(ti, t, y)])))
+    if not out:
+        return np.empty((0, 2))
+    p = np.vstack(out)
+    return p[np.isfinite(p).all(axis=1)]
+
+
+def _audit(fig, name, pad=1.0):
+    """Flag text that escapes its axes or lands on plotted data."""
+    fig.canvas.draw()
+    for i, ax in enumerate(fig.axes):
+        ab = ax.get_window_extent()
+        pts = _plotted_points(ax)
+        artists = [(t, "annotation") for t in ax.texts]
+        if ax.get_legend() is not None:
+            artists.append((ax.get_legend(), "legend"))
+        for art, kind in artists:
+            try:
+                bb = art.get_window_extent()
+            except Exception:
+                continue
+            if bb.width == 0 or bb.height == 0:
+                continue
+            what = (repr(art.get_text())[:34] if kind == "annotation"
+                    else "legend")
+            if (bb.x0 < ab.x0 - pad or bb.x1 > ab.x1 + pad
+                    or bb.y0 < ab.y0 - pad or bb.y1 > ab.y1 + pad):
+                side = ("left" if bb.x0 < ab.x0 - pad else
+                        "right" if bb.x1 > ab.x1 + pad else
+                        "bottom" if bb.y0 < ab.y0 - pad else "top")
+                _AUDIT.append(
+                    (name, f"axes {i}: {what} escapes past the {side} edge"))
+            if len(pts):
+                hit = ((pts[:, 0] >= bb.x0) & (pts[:, 0] <= bb.x1)
+                       & (pts[:, 1] >= bb.y0) & (pts[:, 1] <= bb.y1)).sum()
+                if hit:
+                    _AUDIT.append(
+                        (name, f"axes {i}: {what} covers {hit} plotted point(s)"))
+
+
+def _save(fig, name):
+    _audit(fig, name)
+    fig.savefig(os.path.join(OUT, name))
+    plt.close(fig)
+
 
 def load(model):
     t = pd.read_csv(os.path.join(ROOT, "results", "proteingym",
@@ -57,8 +129,13 @@ def fig_tail(models):
             ax.scatter([d.mean()], [i], marker="|", s=170, color="black", zorder=5)
             w = d.min()
             if w < -0.10:  # label only the collapses, not the ordinary spread
-                ax.annotate(f"{w:.2f}", (w, i), textcoords="offset points",
-                            xytext=(2, 6), fontsize=6.5, color=COL[c])
+                # Anchor in the empty gap between two rows, not above the row
+                # centre: the jitter is +-0.22 rows, so a few points of offset
+                # leaves the label sitting on its own scatter. y is inverted, so
+                # i - 0.34 is drawn above row i and clear of both bands.
+                ax.annotate(f"{w:.2f}", (w, i - 0.34), textcoords="offset points",
+                            xytext=(2, 0), fontsize=6.5, color=COL[c],
+                            va="center")
         ax.axvline(0, color="0.6", lw=0.7, zorder=0)
         ax.set_yticks(range(len(CFGS)))
         ax.set_yticklabels([LBL[c] for c in CFGS], family="monospace")
@@ -68,8 +145,7 @@ def fig_tail(models):
     axes[0].invert_yaxis()
     fig.text(0.5, -0.10, "Each point is one of 201 assays; the black tick is the "
              "benchmark mean.", ha="center", fontsize=7, color="0.3")
-    fig.savefig(os.path.join(OUT, "fig_tail.pdf"))
-    plt.close(fig)
+    _save(fig, "fig_tail.pdf")
 
 
 def fig_fidelity(models):
@@ -102,8 +178,7 @@ def fig_fidelity(models):
     axes[0].set_title(r"magnitude: predictable ($r=0.74/0.81/0.56$)")
     axes[1].set_ylabel(r"$\Delta\rho$ vs experiment (signed)")
     axes[1].set_title(r"direction: not ($r=+0.10/-0.58/-0.40$)")
-    fig.savefig(os.path.join(OUT, "fig_fidelity.pdf"))
-    plt.close(fig)
+    _save(fig, "fig_fidelity.pdf")
 
 
 def fig_pareto():
@@ -133,7 +208,7 @@ def fig_pareto():
     # Hand-placed label offsets: the interesting configurations cluster tightly
     # in both panels, so the default offset overlaps them into illegibility.
     off_bulk = {"fp32": (7, 2), "bf16": (7, 2), "int8_wo": (-8, 9),
-                "int8_dyn": (-46, -11), "fp8_dyn": (5, -12), "int4_wo": (7, 2)}
+                "int8_dyn": (-46, -11), "fp8_dyn": (-16, -13), "int4_wo": (7, 2)}
     off_dms = {"fp32": (7, 2), "bf16": (7, 2), "int8_wo": (5, 7),
                "fp8_dyn": (-10, -13), "int8_dyn": (-14, 8), "int4_wo": (4, -13)}
     fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.7))
@@ -153,8 +228,7 @@ def fig_pareto():
         ax.margins(x=0.30, y=0.18)
     fig.text(0.5, -0.07, "Lower-right is better in both panels. The winner "
              "differs between them.", ha="center", fontsize=7, color="0.3")
-    fig.savefig(os.path.join(OUT, "fig_pareto.pdf"))
-    plt.close(fig)
+    _save(fig, "fig_pareto.pdf")
 
 
 def fig_scale():
@@ -175,8 +249,18 @@ def fig_scale():
 
     fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.5))
 
-    # (a) speed relative to bf16. bf16 is a legend entry, not an inline label,
-    # so no text sits on the line it describes.
+    # One legend for the whole figure, below all three panels.
+    #
+    # Panels (a) and (c) previously carried their own legends, listing nearly
+    # the same series twice and forcing headroom into both: (a) ran to y=1.85
+    # for data that stops at 1.01, so the curves used barely half the panel. A
+    # six-entry two-column legend also does not fit a 101 px axes at any
+    # readable size -- measured, not guessed -- and the overflow silently
+    # overprinted panel (b)'s y-axis label. Moving it out fixes the collision
+    # and lets both panels use their full height.
+    handles = []
+
+    # (a) speed relative to bf16.
     #
     # Solid lines are aggregate throughput (total positions / total seconds),
     # which is what the wall-clock table reports. The dotted fp8_dyn line is the
@@ -186,19 +270,20 @@ def fig_scale():
     # the two conventions separate visibly, and it is the one carrying the
     # claim -- so the alternative is drawn rather than described.
     ax = axes[0]
-    ax.axhline(1.0, color=COL["bf16"], lw=1.2, ls="--", label="bf16 (baseline)")
+    handles.append(ax.axhline(1.0, color=COL["bf16"], lw=1.2, ls="--",
+                              label="bf16 (baseline)"))
     for c in ["fp8_dyn", "int8_wo", "int8_dyn", "int4_wo"]:
-        ax.plot(x, [spd[m][c] / spd[m]["bf16"] for m in ms], "o-",
-                color=COL[c], lw=1.4, ms=4, label=LBL[c], zorder=4)
-    ax.plot(x, [spd_med[m]["fp8_dyn"] / spd_med[m]["bf16"] for m in ms],
-            ls=":", marker="o", ms=3, lw=1.2, color=COL["fp8_dyn"], alpha=0.75,
-            zorder=3, label="fp8_dyn (median-of-assay)")
-    ax.set_ylim(0, 1.85)          # headroom so the legend clears the 1.0 line
+        handles.append(ax.plot(x, [spd[m][c] / spd[m]["bf16"] for m in ms], "o-",
+                               color=COL[c], lw=1.4, ms=4, label=LBL[c],
+                               zorder=4)[0])
+    handles.append(ax.plot(
+        x, [spd_med[m]["fp8_dyn"] / spd_med[m]["bf16"] for m in ms],
+        ls=":", marker="o", ms=3, lw=1.2, color=COL["fp8_dyn"], alpha=0.75,
+        zorder=3, label="fp8_dyn, median-of-assay")[0])
+    ax.set_ylim(0, 1.12)
     ax.set_xlim(-0.25, 2.25)
     ax.set_ylabel("DMS speed relative to bf16")
     ax.set_title("(a) quantization catches up")
-    ax.legend(frameon=False, loc="upper left", ncol=2, columnspacing=0.7,
-              handlelength=1.5, borderpad=0.1, fontsize=5.6, labelspacing=0.28)
 
     # (b) accuracy vs scale. margins keep the value labels off the spines.
     ax = axes[1]
@@ -209,8 +294,8 @@ def fig_scale():
     for i, m in enumerate(ms):
         ax.annotate(f"{rho[m]:.4f}", (i, rho[m]), textcoords="offset points",
                     xytext=(7, 6), fontsize=6.5, ha="left")
-    ax.set_ylim(0.4280, 0.4530)
-    ax.set_xlim(-0.30, 2.75)
+    ax.set_ylim(0.4280, 0.4500)
+    ax.set_xlim(-0.30, 3.05)     # room for the last value label inside the axes
     ax.set_ylabel(r"fp32 mean $\rho$ vs experiment")
     ax.set_title("(b) accuracy does not follow")
 
@@ -222,22 +307,22 @@ def fig_scale():
     # top of it and it vanished. It needs the higher zorder too.
     for c in CFGS:
         ax.plot(x, [tail[m][c] for m in ms], marker="o", color=COL[c], lw=1.4,
-                ms=4, ls="--" if c == "bf16" else "-", label=LBL[c],
+                ms=4, ls="--" if c == "bf16" else "-",
                 zorder=5 if c == "bf16" else 3)
-    ax.set_ylim(-14, 232)
+    ax.set_ylim(-8, 196)
     ax.set_xlim(-0.25, 2.25)
     ax.set_ylabel("assays with " + r"$\rho_{\mathrm{fp32}}<0.99$")
     ax.set_title("(c) fidelity crossover")
-    ax.legend(frameon=False, loc="upper right", fontsize=6, handlelength=1.4,
-              borderpad=0.1, labelspacing=0.25)
 
     for ax in axes:
         ax.set_xticks(x)
         ax.set_xticklabels(["650M", "3B", "15B"])
         ax.set_xlabel("model scale")
     fig.subplots_adjust(wspace=0.48)
-    fig.savefig(os.path.join(OUT, "fig_scale.pdf"))
-    plt.close(fig)
+    fig.legend(handles=handles, frameon=False, loc="lower center",
+               bbox_to_anchor=(0.5, -0.16), ncol=6, fontsize=6.5,
+               handlelength=1.8, columnspacing=1.1, handletextpad=0.5)
+    _save(fig, "fig_scale.pdf")
 
 
 def fig_dominance():
@@ -284,8 +369,7 @@ def fig_dominance():
              "more throughput (b). Every frontier point is ESM2-650M.",
              ha="center", fontsize=7, color="0.3")
     fig.subplots_adjust(wspace=0.32)
-    fig.savefig(os.path.join(OUT, "fig_dominance.pdf"))
-    plt.close(fig)
+    _save(fig, "fig_dominance.pdf")
 
 
 def fig_w8a8():
@@ -335,8 +419,7 @@ def fig_w8a8():
     fig.text(0.5, -0.06, "Symmetric activation scaling owns the entire tail; "
              "both repairs remove it.", ha="center", fontsize=7, color="0.3")
     fig.subplots_adjust(wspace=0.34)
-    fig.savefig(os.path.join(OUT, "fig_w8a8.pdf"))
-    plt.close(fig)
+    _save(fig, "fig_w8a8.pdf")
 
 
 def fig_snr():
@@ -350,9 +433,14 @@ def fig_snr():
                    color=COL[c], linewidths=0, label=LBL[c])
     ax.axhline(0.05, color="0.35", lw=0.9, ls="--")
     ax.axvline(8, color="0.35", lw=0.9, ls=":")
-    ax.annotate("damage threshold 0.05", (1.05, 0.062), fontsize=6, color="0.35")
+    # Both labels go where the figure's own claim guarantees empty space: above
+    # the damage threshold and to the right of the SNR cut. Placing the
+    # threshold label at the left, where the damaged points are, put it on top
+    # of four of them.
+    ax.annotate("damage threshold 0.05", (250, 0.058), fontsize=6, color="0.35",
+                ha="right")
     ax.annotate("no damaged point in this quadrant\n(all-clear: SNR > 8)",
-                (10.5, 0.19), fontsize=6, color="0.35")
+                (10.5, 0.16), fontsize=6, color="0.35")
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel(r"SNR $=\mathrm{sd}(\sigma_{\mathrm{fp32}})\,/\,"
@@ -361,8 +449,7 @@ def fig_snr():
     leg = ax.legend(frameon=False, fontsize=6, loc="lower left", markerscale=2.2)
     for h in leg.legend_handles:
         h.set_alpha(1)
-    fig.savefig(os.path.join(OUT, "fig_snr.pdf"))
-    plt.close(fig)
+    _save(fig, "fig_snr.pdf")
 
 
 def main():
@@ -380,6 +467,12 @@ def main():
               "fig_w8a8.pdf", "fig_snr.pdf"):
         p = os.path.join(OUT, f)
         print(f"  {f:20s} {os.path.getsize(p) / 1024:6.1f} KB")
+    if _AUDIT:
+        print(f"\n  LAYOUT AUDIT -- {len(_AUDIT)} issue(s):")
+        for fn, msg in _AUDIT:
+            print(f"    {fn:20s} {msg}")
+    else:
+        print("\n  layout audit: no text escapes its axes or covers data.")
 
 
 if __name__ == "__main__":

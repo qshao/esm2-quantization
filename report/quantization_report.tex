@@ -18,6 +18,12 @@
 \newcommand{\best}[1]{\textbf{#1}}
 \captionsetup{font=small}
 
+% Long unbreakable tokens -- assay/configuration, \texttt{torch.compile},
+% max-autotune-no-cudagraphs -- have no break point, so TeX would rather
+% overflow the right margin than stretch a line. Let it stretch instead:
+% margin overflow is a visible defect, a slightly loose line is not.
+\setlength{\emergencystretch}{3em}
+
 \title{\textbf{Quantizing ESM-2 for Protein Language Modelling:\\
 A Measurement Study on Speed, Memory, and Accuracy}}
 \author{Qing Shao\\[2pt]
@@ -608,6 +614,7 @@ null at 15B: the effect has no consistent sign and no monotone trend in scale.
 fp32 mean $\rho$ is $0.4459$, $0.4398$, $0.4323$ respectively.}
 \label{tab:acc3}
 \small
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrlrlrl}
 \toprule
 & \multicolumn{2}{c}{ESM2-650M} & \multicolumn{2}{c}{ESM2-3B} & \multicolumn{2}{c}{ESM2-15B} \\
@@ -615,10 +622,10 @@ fp32 mean $\rho$ is $0.4459$, $0.4398$, $0.4323$ respectively.}
 Config & $\Delta$ & 95\% CI & $\Delta$ & 95\% CI & $\Delta$ & 95\% CI \\
 \midrule
 \cfg{bf16}      & $+0.0000$ & $[-0.0003,+0.0004]$ & $+0.0002$ & $[-0.0001,+0.0004]$ & $+0.0000$ & $[-0.0009,+0.0011]$ \\
-\cfg{int8\_wo}  & $-0.0002$ & $[-0.0006,+0.0002]$ & $+0.0001$ & $[-0.0002,+0.0005]$ & $+0.0002$ & $[-0.0008,+0.0014]$ \\
-\cfg{fp8\_dyn}  & $-0.0008$ & $[-0.0020,+0.0005]$ & $+0.0005$ & $[-0.0007,+0.0017]$ & $+0.0002$ & $[-0.0010,+0.0015]$ \\
-\cfg{int8\_dyn} & $\mathbf{-0.0020}$ & $[-0.0032,-0.0009]$ & $-0.0021$ & $[-0.0072,+0.0017]$ & $-0.0000$ & $[-0.0021,+0.0019]$ \\
-\cfg{int4\_wo}  & $\mathbf{-0.0064}$ & $[-0.0105,-0.0018]$ & $\mathbf{+0.0037}$ & $[+0.0007,+0.0068]$ & $+0.0009$ & $[-0.0014,+0.0034]$ \\
+\cfg{int8\_wo}  & $-0.0002$ & $[-0.0006,+0.0002]$ & $+0.0001$ & $[-0.0002,+0.0005]$ & $+0.0002$ & $[-0.0009,+0.0013]$ \\
+\cfg{fp8\_dyn}  & $-0.0007$ & $[-0.0020,+0.0005]$ & $+0.0005$ & $[-0.0007,+0.0018]$ & $+0.0002$ & $[-0.0010,+0.0015]$ \\
+\cfg{int8\_dyn} & $\mathbf{-0.0020}$ & $[-0.0031,-0.0009]$ & $-0.0021$ & $[-0.0072,+0.0017]$ & $-0.0000$ & $[-0.0022,+0.0020]$ \\
+\cfg{int4\_wo}  & $\mathbf{-0.0064}$ & $[-0.0107,-0.0017]$ & $\mathbf{+0.0037}$ & $[+0.0008,+0.0069]$ & $+0.0009$ & $[-0.0014,+0.0034]$ \\
 \bottomrule
 \end{tabular}
 \end{table}
