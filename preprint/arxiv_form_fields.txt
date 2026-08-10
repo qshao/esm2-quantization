@@ -54,7 +54,7 @@ they were meant to measure.
 ================================================================================
 COMMENTS FIELD (optional but recommended)
 ================================================================================
-35 pages, 7 figures, 3 algorithms, 27 tables. Code and per-assay statistics
+36 pages, 7 figures, 3 algorithms, 27 tables. Code and per-assay statistics
 for all 201 ProteinGym assays available at
 https://github.com/qshao/esm2-quantization
 

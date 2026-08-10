@@ -154,62 +154,74 @@
     {
       "config": "bf16",
       "total_sec": 234.05,
-      "pos_per_s": 347.66,
+      "total_pos": 40775,
+      "pos_per_s_med": 347.66,
       "var_per_s": 7302.2,
       "peak_med": 1.334,
       "peak_max": 1.62,
       "rho_fp32_med": 0.9998203784,
-      "rho_fp32_min": 0.9973625244
+      "rho_fp32_min": 0.9973625244,
+      "pos_per_s_agg": 174.2149113437
     },
     {
       "config": "fp32",
       "total_sec": 820.289,
-      "pos_per_s": 95.01,
+      "total_pos": 40775,
+      "pos_per_s_med": 95.01,
       "var_per_s": 2399.0,
       "peak_med": 2.7,
       "peak_max": 3.251,
       "rho_fp32_med": 1.0,
-      "rho_fp32_min": 1.0
+      "rho_fp32_min": 1.0,
+      "pos_per_s_agg": 49.7080906851
     },
     {
       "config": "fp8_dyn",
       "total_sec": 468.712,
-      "pos_per_s": 103.34,
+      "total_pos": 40775,
+      "pos_per_s_med": 103.34,
       "var_per_s": 1977.4,
       "peak_med": 0.749,
       "peak_max": 1.085,
       "rho_fp32_med": 0.9950588426,
-      "rho_fp32_min": 0.9556356114
+      "rho_fp32_min": 0.9556356114,
+      "pos_per_s_agg": 86.9937189575
     },
     {
       "config": "int4_wo",
       "total_sec": 1401.935,
-      "pos_per_s": 55.4,
+      "total_pos": 40775,
+      "pos_per_s_med": 55.4,
       "var_per_s": 1364.8,
       "peak_med": 0.603,
       "peak_max": 0.887,
       "rho_fp32_med": 0.975729682,
-      "rho_fp32_min": 0.6706790483
+      "rho_fp32_min": 0.6706790483,
+      "pos_per_s_agg": 29.0848006505
     },
     {
       "config": "int8_dyn",
       "total_sec": 1774.557,
-      "pos_per_s": 23.77,
+      "total_pos": 40775,
+      "pos_per_s_med": 23.77,
       "var_per_s": 453.4,
       "peak_med": 0.748,
       "peak_max": 1.033,
       "rho_fp32_med": 0.9959669976,
-      "rho_fp32_min": 0.8894498152
+      "rho_fp32_min": 0.8894498152,
+      "pos_per_s_agg": 22.9775656685
     },
     {
       "config": "int8_wo",
       "total_sec": 289.948,
-      "pos_per_s": 248.98,
+      "total_pos": 40775,
+      "pos_per_s_med": 248.98,
       "var_per_s": 4977.0,
       "peak_med": 0.735,
       "peak_max": 1.019,
       "rho_fp32_med": 0.999596447,
-      "rho_fp32_min": 0.996297333
+      "rho_fp32_min": 0.996297333,
+      "pos_per_s_agg": 140.6286644502
     }
   ],
   "by_category": {

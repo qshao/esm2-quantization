@@ -1,8 +1,8 @@
 # arXiv submission checklist
 
-Build: `./build.sh` → `esm2_quantization.pdf` (35 pp) and `arxiv-submission.tar.gz` (379 KB).
+Build: `./build.sh` → `esm2_quantization.pdf` (36 pp) and `arxiv-submission.tar.gz` (394 KB).
 
-Structure: 31 pp of body + references, then Appendix A (four supporting tables)
+Structure: 32 pp of body + references, then Appendix A (four supporting tables)
 and Appendix B (reproduction commands). 7 figures, 27 tables, 3 algorithms.
 
 Upload **`arxiv-submission.tar.gz`**, not the PDF. arXiv runs its own `pdflatex`
@@ -34,7 +34,7 @@ mismatch stalls the submission in moderation.
 ## Verified
 
 - Compiles standalone from the tarball alone — extracted to a clean directory
-  and built with no access to this repo: 35 pages, **no undefined references or
+  and built with no access to this repo: 36 pages, **no undefined references or
   citations**.
 - **`build.sh` must list every figure in its `tar` line.** Adding a figure to the
   `.tex` without adding it there builds fine locally and fails on arXiv; this has

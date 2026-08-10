@@ -124,7 +124,11 @@ def fig_pareto():
                                        r["throughput"]["peak_mem_gb"])
     s = json.load(open(os.path.join(ROOT, "results", "proteingym",
                                     "summary_3B.json")))["speed_ram"]
-    dms = {r["config"]: (r["pos_per_s"], r["peak_med"]) for r in s}
+    # Restrict to the configurations the bulk panel also has, so the two panels
+    # compare like with like. summary_3B.json additionally carries the two W8A8
+    # repairs, which were only ever run on the DMS side.
+    dms = {r["config"]: (r["pos_per_s_agg"], r["peak_med"])
+           for r in s if r["config"] in bulk}
 
     # Hand-placed label offsets: the interesting configurations cluster tightly
     # in both panels, so the default offset overlaps them into illegibility.
@@ -157,11 +161,12 @@ def fig_scale():
     """Three things that only a scale sweep shows."""
     ms = ["650M", "3B", "15B"]
     x = [0, 1, 2]
-    spd, rho, tail = {}, {}, {}
+    spd, spd_med, rho, tail = {}, {}, {}, {}
     for m in ms:
         j = json.load(open(os.path.join(ROOT, "results", "proteingym",
                                         f"summary_{m}.json")))
-        spd[m] = {r["config"]: r["pos_per_s"] for r in j["speed_ram"]}
+        spd[m] = {r["config"]: r["pos_per_s_agg"] for r in j["speed_ram"]}
+        spd_med[m] = {r["config"]: r["pos_per_s_med"] for r in j["speed_ram"]}
         t = pd.read_csv(os.path.join(ROOT, "results", "proteingym",
                                      f"summary_{m}_per_assay.csv"))
         rho[m] = t[t.config == "fp32"]["rho_expt"].mean()
@@ -172,17 +177,28 @@ def fig_scale():
 
     # (a) speed relative to bf16. bf16 is a legend entry, not an inline label,
     # so no text sits on the line it describes.
+    #
+    # Solid lines are aggregate throughput (total positions / total seconds),
+    # which is what the wall-clock table reports. The dotted fp8_dyn line is the
+    # same data under the median-of-per-assay convention: fp8_dyn pays a fixed
+    # cost per call, so it is disproportionately slow on short assays, which the
+    # median weights as heavily as long ones. It is the only configuration where
+    # the two conventions separate visibly, and it is the one carrying the
+    # claim -- so the alternative is drawn rather than described.
     ax = axes[0]
     ax.axhline(1.0, color=COL["bf16"], lw=1.2, ls="--", label="bf16 (baseline)")
     for c in ["fp8_dyn", "int8_wo", "int8_dyn", "int4_wo"]:
         ax.plot(x, [spd[m][c] / spd[m]["bf16"] for m in ms], "o-",
-                color=COL[c], lw=1.4, ms=4, label=LBL[c])
+                color=COL[c], lw=1.4, ms=4, label=LBL[c], zorder=4)
+    ax.plot(x, [spd_med[m]["fp8_dyn"] / spd_med[m]["bf16"] for m in ms],
+            ls=":", marker="o", ms=3, lw=1.2, color=COL["fp8_dyn"], alpha=0.75,
+            zorder=3, label="fp8_dyn (median-of-assay)")
     ax.set_ylim(0, 1.85)          # headroom so the legend clears the 1.0 line
     ax.set_xlim(-0.25, 2.25)
     ax.set_ylabel("DMS speed relative to bf16")
     ax.set_title("(a) quantization catches up")
     ax.legend(frameon=False, loc="upper left", ncol=2, columnspacing=0.7,
-              handlelength=1.3, borderpad=0.1, fontsize=6, labelspacing=0.3)
+              handlelength=1.5, borderpad=0.1, fontsize=5.6, labelspacing=0.28)
 
     # (b) accuracy vs scale. margins keep the value labels off the spines.
     ax = axes[1]
@@ -261,8 +277,12 @@ def fig_dominance():
                         ms=7, label="Pareto frontier"))
     axes[0].legend(handles=h, frameon=False, loc="lower left", fontsize=6,
                    handletextpad=0.4, labelspacing=0.3)
-    fig.text(0.5, -0.06, "Upper-left is better in both panels. Every frontier "
-             "point is ESM2-650M.", ha="center", fontsize=7, color="0.3")
+    # The two x-axes point in opposite directions -- less memory is better, more
+    # throughput is better -- so a single "upper-left is better" would be wrong
+    # for the right panel. Say it per panel.
+    fig.text(0.5, -0.06, "Up is more accurate. Left is less memory (a); right is "
+             "more throughput (b). Every frontier point is ESM2-650M.",
+             ha="center", fontsize=7, color="0.3")
     fig.subplots_adjust(wspace=0.32)
     fig.savefig(os.path.join(OUT, "fig_dominance.pdf"))
     plt.close(fig)

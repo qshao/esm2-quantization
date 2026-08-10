@@ -118,7 +118,7 @@ This paper addresses three questions:
   \item The observation that \textbf{the configuration ranking is
         scale-dependent}. The two common ESM-2 workloads prefer opposite
         configurations at 650M and 3B, but FP8 dynamic quantization closes from
-        $0.30\times$ to $0.97\times$ bf16 DMS speed as scale grows, so the
+        $0.50\times$ to $1.01\times$ bf16 DMS throughput as scale grows, so the
         conflict dissolves by 15B. A recommendation derived at one scale does
         not transfer.
   \item Evidence that \textbf{scale does not buy variant-effect accuracy}:
@@ -146,7 +146,7 @@ This paper addresses three questions:
         replicate runs on different GPUs give bitwise-identical scores over
         19.3M comparisons, so the reported differences are properties of the
         configurations rather than of the runs.
-  \item Open code, per-variant predictions for all 21 model/configuration
+  \item Open code, per-variant predictions for all 20 model/configuration
         combinations, and per-assay statistics (Section~\ref{sec:avail}).
 \end{itemize}
 
@@ -405,8 +405,12 @@ $-0.0064$ to $-0.0068$.
 
 \subsection{Statistical treatment}
 
-Ground-truth correlations are compared using a \textbf{paired bootstrap} (2000
-resamples). Both the candidate configuration and the fp32 reference are scored
+Ground-truth correlations are compared using a \textbf{paired bootstrap}:
+$R = 2000$ resamples for a single assay, where the unit is the variant, and
+$R = 20{,}000$ for every benchmark-level result, where the unit is the assay and
+$R = 2000$ would floor the two-sided $p$ at $0.001$ --- too coarse to separate
+the cases that matter in Section~\ref{sec:full}. Both the candidate
+configuration and the fp32 reference are scored
 on the \emph{same} resample at each iteration, so shared noise cancels and the
 residual is attributable to the configuration. The pairing is not a refinement:
 for \cfg{int4\_wo} the paired interval is $8.4\times$ narrower than the unpaired
@@ -445,7 +449,7 @@ assay-level bootstrap; we report both.}
 \begin{algorithmic}[1]
 \Require per-assay correlations $\rho^{c}_{a}, \rho^{\text{ref}}_{a}$ for assays
          $a = 1{:}n$; protein clusters $\mathcal{G}$ partitioning the assays;
-         $R = 2000$
+         $R = 20{,}000$
 \Ensure point estimate $\Delta$, 95\% interval, two-sided $p$
 \State $\Delta \gets \frac{1}{n}\sum_a \rho^{c}_{a} - \frac{1}{n}\sum_a \rho^{\text{ref}}_{a}$
 \For{$r = 1$ \textbf{to} $R$}
@@ -458,7 +462,7 @@ assay-level bootstrap; we report both.}
 \EndFor
 \State $[\,\ell, u\,] \gets$ 2.5th and 97.5th percentiles of $\{d_r\}$
 \State $p \gets 2\min\!\big(\tfrac{1}{R}|\{d_r \le 0\}|,\; \tfrac{1}{R}|\{d_r \ge 0\}|\big)$
-       \Comment{floor $2/R = 0.001$; report smaller values as $p < 0.002$}
+       \Comment{floor $2/R = 10^{-4}$; report smaller values as $p < 2\times10^{-4}$}
 \State \Return $\Delta$, $[\ell, u]$, $p$; call the effect real iff $0 \notin [\ell, u]$
 \end{algorithmic}
 \end{algorithm}
@@ -767,7 +771,7 @@ it is reported because that had to be measured rather than assumed.
 \centering
 \caption{Change in mean Spearman against experiment relative to fp32, over 201
 assays, at each model scale. Bold marks intervals excluding zero under the
-protein-clustered paired bootstrap. \cfg{int4\_wo} is significant in
+protein-clustered paired bootstrap at $R = 20{,}000$ (Algorithm~\ref{alg:boot}). \cfg{int4\_wo} is significant in
 \emph{opposite directions} at 650M and 3B and null at 15B; the effect does not
 merely vary in size, it has no consistent sign and no monotone trend in scale.
 fp32 mean $\rho$ is $0.4459$, $0.4398$ and $0.4323$ respectively.}
@@ -780,15 +784,15 @@ fp32 mean $\rho$ is $0.4459$, $0.4398$ and $0.4323$ respectively.}
 Config & $\Delta$ & 95\% CI & $\Delta$ & 95\% CI & $\Delta$ & 95\% CI \\
 \midrule
 \cfg{bf16}      & $+0.0000$ & $[-0.0003,+0.0004]$ & $+0.0002$ & $[-0.0001,+0.0004]$ & $+0.0000$ & $[-0.0009,+0.0011]$ \\
-\cfg{int8\_wo}  & $-0.0002$ & $[-0.0006,+0.0002]$ & $+0.0001$ & $[-0.0002,+0.0005]$ & $+0.0002$ & $[-0.0008,+0.0014]$ \\
-\cfg{fp8\_dyn}  & $-0.0008$ & $[-0.0020,+0.0005]$ & $+0.0005$ & $[-0.0007,+0.0017]$ & $+0.0002$ & $[-0.0010,+0.0015]$ \\
-\cfg{int8\_dyn} & $\mathbf{-0.0020}$ & $[-0.0032,-0.0009]$ & $-0.0021$ & $[-0.0072,+0.0017]$ & $-0.0000$ & $[-0.0021,+0.0019]$ \\
-\cfg{int4\_wo}  & $\mathbf{-0.0064}$ & $[-0.0105,-0.0018]$ & $\mathbf{+0.0037}$ & $[+0.0007,+0.0068]$ & $+0.0009$ & $[-0.0014,+0.0034]$ \\
+\cfg{int8\_wo}  & $-0.0002$ & $[-0.0006,+0.0002]$ & $+0.0001$ & $[-0.0002,+0.0005]$ & $+0.0002$ & $[-0.0009,+0.0013]$ \\
+\cfg{fp8\_dyn}  & $-0.0007$ & $[-0.0020,+0.0005]$ & $+0.0005$ & $[-0.0007,+0.0018]$ & $+0.0002$ & $[-0.0010,+0.0015]$ \\
+\cfg{int8\_dyn} & $\mathbf{-0.0020}$ & $[-0.0031,-0.0009]$ & $-0.0021$ & $[-0.0072,+0.0017]$ & $-0.0000$ & $[-0.0022,+0.0020]$ \\
+\cfg{int4\_wo}  & $\mathbf{-0.0064}$ & $[-0.0107,-0.0017]$ & $\mathbf{+0.0037}$ & $[+0.0008,+0.0069]$ & $+0.0009$ & $[-0.0014,+0.0034]$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsubsection*{The benchmark mean is the wrong safety criterion}
+\subsubsection{The benchmark mean is the wrong safety criterion}
 \label{sec:tail}
 
 Every $\Delta$ in Table~\ref{tab:acc3} is below $0.007$. The per-assay tail is
@@ -887,7 +891,7 @@ usable at all, \cfg{int8\_dyn} at 3B damages 2 of 157 and \cfg{int4\_wo} damages
 4--5 of 157 by more than $0.05$: roughly a 1--3\% chance that a given target is
 affected. That is the number to act on, and it is not visible in a mean.
 
-\subsubsection*{At 15B the safe configurations degrade and the aggressive one improves}
+\subsubsection{At 15B the safe configurations degrade and the aggressive one improves}
 
 Scale does not move all configurations in the same direction, and the crossover
 is visible only with a third point (Figure~\ref{fig:scale}c,
@@ -949,7 +953,7 @@ Scale & Config & Worst assay & $\Delta\rho$ \\
 \midrule
 650M & \cfg{bf16}      & \texttt{AICDA\_HUMAN\_Gajula\_2014\_3cycles} ($L{=}198$) & $-0.0040$ \\
 650M & \cfg{int8\_dyn} & \texttt{POLG\_PESV\_Tsuboyama\_2023\_2MXD} ($L{=}53$)    & $-0.0411$ \\
-650M & \cfg{int4\_wo}  & \texttt{B2L11\_HUMAN\_Dutta\_2010} ($L{=}198$)           & $-0.2024$ \\
+650M & \cfg{int4\_wo}  & \texttt{B2L11\_HUMAN\_Dutta\_2010\_binding-Mcl-1} ($L{=}198$) & $-0.2024$ \\
 \addlinespace
 3B   & \cfg{bf16}      & \texttt{ODP2\_GEOSE\_Tsuboyama\_2023\_1W4G} ($L{=}44$)   & $-0.0072$ \\
 3B   & \cfg{int8\_dyn} & \texttt{UBR5\_HUMAN\_Tsuboyama\_2023\_1I2T} ($L{=}58$)   & $-0.3688$ \\
@@ -962,7 +966,16 @@ Scale & Config & Worst assay & $\Delta\rho$ \\
 \end{tabular}
 \end{table}
 
-\subsubsection*{Resource envelope at 15B}
+\subsubsection{Resource envelope at 15B}
+
+Peak memory at 15B is almost entirely weights, and the practical consequence is
+a hardware boundary rather than a preference: fp32 needs $57$\,GB of weights
+before activations, so the reference configuration alone does not fit an
+80\,GB A100, and \cfg{bf16} at $28.6$\,GB leaves little room beside it. Every
+quantized configuration returns the model to a single accelerator with margin,
+which at this scale is what quantization is for --- the accuracy question of
+Table~\ref{tab:acc3} only arises once the model runs at all
+(Table~\ref{tab:res15b}).
 
 \begin{table}[htb]
 \centering
@@ -989,7 +1002,7 @@ Config & Weights (GB) & \multicolumn{3}{c}{Peak memory over 201 assays (GB)} \\
 \end{tabular}
 \end{table}
 
-\subsubsection*{The configuration ranking is scale-dependent}
+\subsubsection{The configuration ranking is scale-dependent}
 \label{sec:scaledep}
 
 Section~\ref{sec:opposite} reports that the two workloads prefer opposite
@@ -999,24 +1012,33 @@ loses badly at DMS scoring. That holds at 650M and 3B and stops holding at 15B.
 \begin{table}[htb]
 \centering
 \caption{DMS scoring speed relative to \cfg{bf16} over the full 201-assay
-benchmark, by model scale. Weight-only \cfg{int8\_wo} holds a constant ratio,
-as expected for a scheme that adds fixed dequantization work. \cfg{fp8\_dyn}
-closes from $0.30\times$ to $0.97\times$: its overhead is per-call while the
-useful work grows with $L$ and hidden size, so by 15B the GEMMs are large
-enough to be compute-bound even in the narrow-batch DMS regime.}
+benchmark, under both aggregation conventions. \emph{Throughput} is total masked
+positions over total seconds, and is the figure consistent with the wall-clock
+hours of Table~\ref{tab:speedram3}; \emph{median} is the median of the 201
+per-assay rates, which weights a 40-position assay as heavily as a 900-position
+one. \cfg{bf16} runs at $174.2$, $93.7$ and $29.4$ positions/s by throughput and
+$347.7$, $200.6$ and $56.7$ by median. Weight-only \cfg{int8\_wo} holds a
+constant ratio under either convention, as expected for a scheme adding fixed
+dequantization work per weight. \cfg{fp8\_dyn} closes on \cfg{bf16} as scale
+grows under both, reaching parity at 15B: its overhead is per-call while the
+useful work grows with hidden size, so by 15B the GEMMs are large enough to be
+compute-bound even in the narrow-batch DMS regime. That same per-call overhead
+is why the two conventions separate for \cfg{fp8\_dyn} and for no other
+configuration --- a fixed cost per forward pass is proportionally worst on short
+assays, which the median weights most heavily. The paragraph below the table
+sets out the choice.}
 \label{tab:scale}
 \small
 \begin{tabular}{lrrrrrr}
 \toprule
 & \multicolumn{2}{c}{ESM2-650M} & \multicolumn{2}{c}{ESM2-3B} & \multicolumn{2}{c}{ESM2-15B} \\
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
-Config & pos/s & vs bf16 & pos/s & vs bf16 & pos/s & vs bf16 \\
+Config & tput & median & tput & median & tput & median \\
 \midrule
-\cfg{bf16}      & 347.7 & $1.00\times$ & 200.6 & $1.00\times$ & 56.7 & $1.00\times$ \\
-\cfg{int8\_wo}  & 249.0 & $0.72\times$ & 139.3 & $0.69\times$ & 41.0 & $0.72\times$ \\
-\cfg{fp8\_dyn}  & 103.3 & $0.30\times$ &  89.2 & $0.44\times$ & 54.9 & $\mathbf{0.97\times}$ \\
-\cfg{int8\_dyn} &  23.8 & $0.07\times$ &  20.1 & $0.10\times$ & 11.3 & $0.20\times$ \\
-\cfg{int4\_wo}  &  55.4 & $0.16\times$ &  17.3 & $0.09\times$ &  3.9 & $0.07\times$ \\
+\cfg{int8\_wo}  & $0.81\times$ & $0.72\times$ & $0.79\times$ & $0.69\times$ & $0.79\times$ & $0.72\times$ \\
+\cfg{fp8\_dyn}  & $0.50\times$ & $0.30\times$ & $0.71\times$ & $0.44\times$ & $\mathbf{1.01\times}$ & $\mathbf{0.97\times}$ \\
+\cfg{int8\_dyn} & $0.13\times$ & $0.07\times$ & $0.18\times$ & $0.10\times$ & $0.24\times$ & $0.20\times$ \\
+\cfg{int4\_wo}  & $0.17\times$ & $0.16\times$ & $0.10\times$ & $0.09\times$ & $0.07\times$ & $0.07\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1028,13 +1050,39 @@ The workload conflict is therefore a small-model phenomenon, and a
 recommendation derived at 650M or 3B does not transfer upward
 (Figure~\ref{fig:scale}).
 
+\paragraph{Which speed convention, and why it matters here.}
+Section~\ref{sec:comparability} argues that an aggregation convention must be
+stated because the choice can exceed the effect being reported. That applies to
+speed at least as sharply as to accuracy. Averaging the 201 per-assay rates
+answers ``how much slower on a typical assay''; dividing total positions by
+total seconds answers ``how much longer does the job take''. For four of the
+five configurations the two agree to within $0.09$, and for \cfg{fp8\_dyn} they
+differ by up to $1.7\times$ --- $0.50$ against $0.30$ at 650M. The gap is not
+noise but the mechanism restated: \cfg{fp8\_dyn}'s per-assay ratio at 3B rises
+from $0.27$ on the shortest quartile of assays to $0.77$ on the longest, so an
+assay-weighted summary is dominated by the short assays where its fixed cost is
+worst, and a position-weighted one by the long assays where it is amortised.
+
+We report throughput as the primary figure, because it is what a user
+experiences and because it is the convention already implied by the wall-clock
+column of Table~\ref{tab:speedram3}. The qualitative conclusion --- that the
+penalty shrinks monotonically with scale and vanishes at 15B --- holds under
+both. A third convention, the unweighted \emph{mean} of per-assay rates, gives
+$0.31$, $0.38$ and $0.56$; we do not adopt it, but note that it is the one
+convention under which ``the conflict dissolves at 15B'' would be an
+overstatement, and that we would not have known which we had used had we not
+computed all three.
+
 \begin{figure}[t]
 \centering
 \includegraphics[width=\textwidth]{fig_scale.pdf}
 \caption{Three effects visible only across scale. \textbf{(a)} DMS speed
-relative to bf16: \cfg{fp8\_dyn} converges on bf16 while the weight-only and
-INT4 paths do not, so ``quantization is pure overhead for DMS'' is
-scale-bounded. \textbf{(b)} fp32 mean Spearman against experiment falls
+relative to bf16, as aggregate throughput: \cfg{fp8\_dyn} converges on bf16
+while the weight-only and INT4 paths do not, so ``quantization is pure overhead
+for DMS'' is scale-bounded. The dotted line repeats \cfg{fp8\_dyn} under the
+median-of-assay convention --- the only configuration for which the choice is
+visible, because its overhead is fixed per call and therefore worst on the short
+assays a median weights most heavily. The convergence holds either way. \textbf{(b)} fp32 mean Spearman against experiment falls
 monotonically across a 23-fold parameter increase; no pairwise difference is
 significant, but there is no evidence that scale buys variant-effect accuracy,
 and 15B costs $5.4\times$ the compute of 3B for the lowest of the three.
@@ -1045,7 +1093,7 @@ configurations move in opposite directions.}
 \label{fig:scale}
 \end{figure}
 
-\subsubsection*{What the larger sample changed}
+\subsubsection{What the larger sample changed}
 
 \textbf{The three-assay verdict was backwards, and the correction does not
 resolve into a trend.} Section~\ref{sec:gt} concluded that quantization does not
@@ -1090,14 +1138,14 @@ So the scale dependence of \cfg{int4\_wo} is established, while the sign of its
 effect at any single scale is not: the difference between scales is larger and
 better resolved than either endpoint. That is the more useful statement anyway,
 since it is the one that tells a practitioner a result measured at one scale
-does not transfer. All bootstrap results in this paper use $R = 20{,}000$;
-$R = 2000$ floors the two-sided $p$ at $0.001$, which is too coarse to
-distinguish these cases.
+does not transfer.
 
 \textbf{Fidelity predicts magnitude, not direction.} Across 3015
 assay/configuration pairs, $r(1-\rho_{\text{fp32}},|\Delta|)$ is $0.74$, $0.81$
-and $0.56$ at 650M, 3B and 15B --- consistent with the $0.87$ first estimated
-from 15 pairs. The \emph{signed} correlation is $+0.10$, $-0.58$ and $-0.40$:
+and $0.56$ at 650M, 3B and 15B. The $0.87$ first estimated from 15 pairs sits
+above all three, which is what a three-assay estimate of a correlation should be
+expected to do; the bound survives at scale, but weaker than the pilot implied.
+The \emph{signed} correlation is $+0.10$, $-0.58$ and $-0.40$:
 it does not hold its sign across scales and is therefore useless for
 prediction. $\rho_{\text{fp32}}$ remains the correct cheap screen, bounding how
 far an answer can move while saying nothing about which way
@@ -1154,7 +1202,7 @@ MSA depth: high     & $-0.0042$ & $+0.0097$ & $+0.0033$ \\
 \end{tabular}
 \end{table}
 
-\subsubsection*{The W8A8 collapse is a scaling defect, not a limit of the scheme}
+\subsubsection{The W8A8 collapse is a scaling defect, not a limit of the scheme}
 \label{sec:w8a8fix}
 
 Reporting that \cfg{int8\_dyn} destroys an assay is not the same as establishing
@@ -1193,14 +1241,16 @@ W8A8. Intervals are the same protein-clustered paired bootstrap used throughout
 ($R = 20{,}000$); none of the three differs significantly from fp32 on the
 \emph{mean}, which is exactly the point --- the mean cannot separate them and
 the worst case can. Worst-assay fidelity $\rho_{\text{fp32}}$ is $0.393$,
-$0.965$ and $0.737$ respectively. These two remedy comparisons bring the family
+$0.965$ and $0.737$ respectively; \emph{tput} is aggregate masked positions per
+second, i.e.\ total positions over total seconds. These two remedy comparisons
+bring the family
 of tests against fp32 to 17, giving a Bonferroni threshold of $0.0029$; the
 conclusions in Section~\ref{sec:full} are unchanged by the revised denominator.}
 \label{tab:w8a8}
 \small
 \begin{tabular}{lrlrrrr}
 \toprule
-Config & mean $\Delta$ & 95\% CI & worst $\Delta$ & $|\Delta|>0.05$ & pos/s & peak GB \\
+Config & mean $\Delta$ & 95\% CI & worst $\Delta$ & $|\Delta|>0.05$ & tput & peak GB \\
 \midrule
 \cfg{int8\_dyn}       & $-0.0021$ & $[-0.0072,+0.0017]$ & $\mathbf{-0.3688}$ & 6 & 17.0 & 3.51 \\
 \cfg{int8\_dyn\_asym} & $-0.0001$ & $[-0.0009,+0.0008]$ & $-0.0395$ & \textbf{0} & \textbf{33.1} & 4.13 \\
@@ -1245,7 +1295,7 @@ allocates half the INT8 range to values of a sign that post-GELU activations
 rarely take, which is a plausible account of why the asymmetric variant helps,
 though we have not isolated it.
 
-\subsubsection*{The repair helps accuracy on both workloads and speed on only one}
+\subsubsection{The repair helps accuracy on both workloads and speed on only one}
 
 The asymmetric variant was adopted above on DMS evidence, where it is both more
 accurate and $1.95\times$ faster than symmetric. Applying that conclusion to
@@ -1280,7 +1330,7 @@ unmeasured. The recommendation for FP8-less hardware is stated as an inference
 from this ordering rather than as a measurement, and marked as such in
 Table~\ref{tab:recs}.
 
-\subsubsection*{A label-free screen for which assays are at risk}
+\subsubsection{A label-free screen for which assays are at risk}
 \label{sec:snr}
 
 Chasing this mechanism produced something more useful than the mechanism. What
@@ -1297,9 +1347,11 @@ reference on a user's own target, with no experimental labels:
 \centering
 \caption{SNR against realised damage, over all 3015 assay/configuration/scale
 combinations. Every collapse beyond $0.10$ in this study has $\mathrm{SNR} <
-1.7$, and no combination with $\mathrm{SNR} > 8$ is damaged beyond $0.05$. It
-is therefore usable as an all-clear rather than as a precise predictor: a high
-SNR licenses deployment, a low one demands a closer look.}
+1.7$, and no combination with $\mathrm{SNR} > 8$ is damaged beyond $0.05$. The
+$0.0$\% is $0$ of $2233$, which bounds the underlying rate at $0.13$\% with
+95\% confidence rather than establishing it as zero. The screen is therefore
+usable as an all-clear rather than as a precise predictor: a high SNR licenses
+deployment, a low one demands a closer look.}
 \label{tab:snr}
 \small
 \begin{tabular}{lrrrr}
@@ -1366,7 +1418,7 @@ because it is calibrated: $\rho_{\text{fp32}}$ bounds how far an answer can move
 without saying whether that distance matters for the assay at hand, whereas SNR
 compares the movement to the signal it has to preserve. We would now run both.
 
-\subsubsection*{Quantization competes with using a smaller model, and loses}
+\subsubsection{Quantization competes with using a smaller model, and loses}
 
 Every comparison so far is within a scale: a configuration against fp32 on the
 same checkpoint. That is the wrong frame for a practitioner, who is not obliged
@@ -1377,32 +1429,45 @@ configurations are non-dominated, and all three are 650M}
 
 \begin{table}[htb]
 \centering
-\caption{Cross-scale Pareto surface. An option is dominated if another is at
-least as good on accuracy, peak memory \emph{and} speed, and strictly better on
-one. Every 3B and 15B configuration is dominated by a 650M one --- including
-3B/\cfg{int4\_wo}, the configuration our own recommendations table previously
-offered for minimum memory, which uses \emph{more} memory than 650M/\cfg{bf16}
-while being less accurate and $20\times$ slower.}
+\caption{Cross-scale Pareto surface, all eighteen scale/configuration
+combinations, ordered by accuracy. An option is dominated if another is at least
+as good on accuracy, peak memory \emph{and} speed, and strictly better on one;
+the dominator named is in every case itself on the frontier. Speed is aggregate
+throughput --- total masked positions over total seconds --- and the frontier is
+unchanged if the
+median-of-assay convention is substituted --- the same three options are
+non-dominated either way, so this result does not rest on that choice. Every 3B
+and 15B configuration is dominated by a 650M one, including 3B/\cfg{int4\_wo},
+which our own recommendations table previously offered for minimum memory and
+which uses \emph{more} memory than 650M/\cfg{bf16} while being less accurate and
+$19\times$ slower.}
 \label{tab:pareto}
 \small
 \begin{tabular}{llrrrl}
 \toprule
 Scale & Config & mean $\rho$ & peak GB & pos/s & Status \\
 \midrule
-650M & \cfg{bf16}      & 0.4460 &  1.33 & 347.7 & \textbf{frontier} \\
-650M & \cfg{int8\_wo}  & 0.4457 &  0.73 & 249.0 & \textbf{frontier} \\
-650M & \cfg{int4\_wo}  & 0.4395 &  0.60 &  55.4 & \textbf{frontier} \\
+650M & \cfg{bf16}      & 0.4460 &  1.33 & 174.2 & \textbf{frontier} \\
+650M & \cfg{int8\_wo}  & 0.4457 &  0.73 & 140.6 & \textbf{frontier} \\
+650M & \cfg{int4\_wo}  & 0.4395 &  0.60 &  29.1 & \textbf{frontier} \\
 \addlinespace
-650M & \cfg{fp32}      & 0.4459 &  2.70 &  95.0 & dominated by 650M/\cfg{bf16} \\
-650M & \cfg{fp8\_dyn}  & 0.4452 &  0.75 & 103.3 & dominated by 650M/\cfg{int8\_wo} \\
-650M & \cfg{int8\_dyn} & 0.4440 &  0.75 &  23.8 & dominated by 650M/\cfg{int8\_wo} \\
-3B   & \cfg{int4\_wo}  & 0.4435 &  1.82 &  17.3 & dominated by 650M/\cfg{bf16} \\
-3B   & \cfg{bf16}      & 0.4399 &  5.50 & 200.6 & dominated by 650M/\cfg{bf16} \\
-3B   & \cfg{int8\_wo}  & 0.4399 &  2.87 & 139.3 & dominated by 650M/\cfg{bf16} \\
-3B   & \cfg{fp32}      & 0.4398 & 11.10 &  25.6 & dominated by 650M/\cfg{fp32} \\
-15B  & \cfg{int4\_wo}  & 0.4332 &  7.91 &   3.9 & dominated by 650M/\cfg{fp32} \\
-15B  & \cfg{fp8\_dyn}  & 0.4325 & 14.57 &  54.9 & dominated by 650M/\cfg{fp32} \\
-15B  & \cfg{bf16}      & 0.4323 & 28.57 &  56.7 & dominated by 650M/\cfg{fp32} \\
+650M & \cfg{fp32}      & 0.4459 &  2.70 &  49.7 & dominated by 650M/\cfg{bf16} \\
+650M & \cfg{fp8\_dyn}  & 0.4452 &  0.75 &  87.0 & dominated by 650M/\cfg{int8\_wo} \\
+650M & \cfg{int8\_dyn} & 0.4440 &  0.75 &  23.0 & dominated by 650M/\cfg{int8\_wo} \\
+\addlinespace
+3B   & \cfg{int4\_wo}  & 0.4435 &  1.82 &   9.2 & dominated by 650M/\cfg{bf16} \\
+3B   & \cfg{fp8\_dyn}  & 0.4403 &  2.90 &  66.6 & dominated by 650M/\cfg{bf16} \\
+3B   & \cfg{bf16}      & 0.4399 &  5.50 &  93.7 & dominated by 650M/\cfg{bf16} \\
+3B   & \cfg{int8\_wo}  & 0.4399 &  2.87 &  74.0 & dominated by 650M/\cfg{bf16} \\
+3B   & \cfg{fp32}      & 0.4398 & 11.10 &  15.1 & dominated by 650M/\cfg{bf16} \\
+3B   & \cfg{int8\_dyn} & 0.4376 &  2.94 &  17.0 & dominated by 650M/\cfg{bf16} \\
+\addlinespace
+15B  & \cfg{int4\_wo}  & 0.4332 &  7.91 &   2.1 & dominated by 650M/\cfg{bf16} \\
+15B  & \cfg{fp8\_dyn}  & 0.4325 & 14.57 &  29.7 & dominated by 650M/\cfg{bf16} \\
+15B  & \cfg{int8\_wo}  & 0.4325 & 14.53 &  23.4 & dominated by 650M/\cfg{bf16} \\
+15B  & \cfg{bf16}      & 0.4323 & 28.57 &  29.4 & dominated by 650M/\cfg{bf16} \\
+15B  & \cfg{fp32}      & 0.4323 & 57.09 &   3.3 & dominated by 650M/\cfg{bf16} \\
+15B  & \cfg{int8\_dyn} & 0.4322 & 14.90 &   7.1 & dominated by 650M/\cfg{bf16} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1411,11 +1476,12 @@ Scale & Config & mean $\rho$ & peak GB & pos/s & Status \\
 \centering
 \includegraphics[width=\textwidth]{fig_dominance.pdf}
 \caption{All eighteen scale/configuration combinations on two projections of the
-Pareto surface; upper-left is better in both panels. Circled points are
-non-dominated, and all are ESM2-650M. The practical consequence is that
-aggressive quantization of a large model is not a way to buy a small memory
-footprint for this workload --- a small model already provides one, more
-accurately and far faster.}
+Pareto surface. Higher is more accurate in both panels; the horizontal axes run
+in opposite senses, so better is leftward against peak memory \textbf{(a)} and
+rightward against throughput \textbf{(b)}. Circled points are non-dominated,
+and all are ESM2-650M. The practical consequence is that aggressive quantization
+of a large model is not a way to buy a small memory footprint for this workload
+--- a small model already provides one, more accurately and far faster.}
 \label{fig:dominance}
 \end{figure}
 
@@ -1435,12 +1501,14 @@ Section~\ref{sec:tail} argues that means are the wrong selection criterion --- a
 practitioner with a specific target should check the tail rather than read the
 frontier off this table.
 
-\subsubsection*{Speed and memory over the whole benchmark}
+\subsubsection{Speed and memory over the whole benchmark}
 
 \begin{table}[htb]
 \centering
 \caption{Full 201-assay benchmark by model scale, uncompiled, one H200.
-Wall-clock is summed scoring time; peak memory is the median across assays.
+Wall-clock is summed scoring time --- the quantity the throughput ratios of
+Table~\ref{tab:scale} are consistent with --- and peak memory is the median
+across assays.
 fp32 at 15B needs 57\,GB, so the reference configuration alone rules out an
 80\,GB A100 once activations are included.}
 \label{tab:speedram3}
@@ -1453,7 +1521,7 @@ Config & hours & peak GB & hours & peak GB & hours & peak GB \\
 \midrule
 \cfg{fp32}      & 0.23 &  2.70 & 0.75 & 11.10 & 3.40 & 57.09 \\
 \cfg{bf16}      & \textbf{0.07} &  1.33 & \textbf{0.12} &  5.50 & 0.39 & 28.57 \\
-\cfg{int8\_wo}  & 0.08 &  0.73 & 0.15 &  2.87 & 0.49 & 14.53 \\
+\cfg{int8\_wo}  & 0.08 &  0.73 & 0.15 &  2.87 & 0.48 & 14.53 \\
 \cfg{fp8\_dyn}  & 0.13 &  0.75 & 0.17 &  2.90 & \textbf{0.38} & 14.57 \\
 \cfg{int8\_dyn} & 0.49 &  0.75 & 0.67 &  2.94 & 1.61 & 14.90 \\
 \cfg{int4\_wo}  & 0.39 &  \textbf{0.60} & 1.23 &  \textbf{1.82} & 5.47 &  \textbf{7.91} \\
@@ -1465,7 +1533,7 @@ The DMS recommendation from three assays survives at 650M and 3B and inverts at
 15B. Up to 3B, \cfg{bf16} eager is fastest at every problem size --- $6.2\times$
 faster than fp32 end-to-end at 3B --- with ground-truth agreement never moving
 more than $0.018$ across 402 assay/model pairs, and \cfg{int8\_wo} is the memory
-fallback at roughly 70\% of bf16 speed. At 15B, \cfg{fp8\_dyn} matches bf16 on
+fallback at roughly 80\% of bf16 throughput. At 15B, \cfg{fp8\_dyn} matches bf16 on
 speed at half the memory and becomes the default. \cfg{int8\_dyn} and
 \cfg{int4\_wo} are not trade-offs for this workload at any scale: they are
 slower than bf16 \emph{and} carry the two worst tails in Table~\ref{tab:tail3}.
@@ -1597,8 +1665,9 @@ Figure~\ref{fig:pareto} shows the two frontiers side by side.
 one model.} (The evidence is one-sided: the DMS side of the comparison spans
 three scales, the bulk-embedding side is measured at 3B only.) The mechanism is that \cfg{fp8\_dyn}'s per-call quantization
 overhead is fixed while the useful work grows with hidden size, so the penalty
-shrinks as the model grows: $0.30\times$ bf16 DMS speed at 650M, $0.44\times$ at
-3B, $0.97\times$ at 15B (Table~\ref{tab:scale}). By 15B the DMS batch is large
+shrinks as the model grows: $0.50\times$ bf16 DMS throughput at 650M,
+$0.71\times$ at 3B, $1.01\times$ at 15B (Table~\ref{tab:scale}; the ordering is
+the same under the median-of-assay convention, at $0.30$, $0.44$ and $0.97$). By 15B the DMS batch is large
 enough in the hidden dimension to be compute-bound despite being narrow in the
 batch dimension, and \cfg{fp8\_dyn} becomes the right choice for \emph{both}
 workloads at half the memory. The general lesson is not that DMS is
@@ -1612,7 +1681,7 @@ of the model and the workload together, not of the workload alone.
 lower-right is better in both panels. \emph{Left:} bulk embedding extraction
 under \texttt{max-autotune}, where \cfg{fp8\_dyn} is fastest and near-smallest.
 \emph{Right:} DMS scoring over the full 201-assay benchmark in eager mode, where
-the same configuration is $2.2\times$ slower than \cfg{bf16} and the ranking is
+the same configuration is $1.4\times$ slower than \cfg{bf16} and the ranking is
 substantially reordered. No single configuration is preferred by both.}
 \label{fig:pareto}
 \end{figure}
@@ -1624,8 +1693,9 @@ The conventional validation practice --- quantize, measure drift against the
 full-precision model, accept if drift is small --- is sound as a
 \emph{risk bound}. Our data support the bound at scale: over 3015
 assay/configuration pairs, fidelity loss correlates with the magnitude of
-ground-truth change at $r = 0.74$, $0.81$ and $0.56$ at 650M, 3B and 15B,
-consistent with the $0.87$ first estimated from 15 pairs.
+ground-truth change at $r = 0.74$, $0.81$ and $0.56$ at 650M, 3B and 15B --- the
+same relationship the 15-pair pilot found at $r = 0.87$, weaker at every scale
+once the sample is large enough to resolve it.
 
 It is not sound as a \emph{quality ranking}. A configuration with larger drift
 is not thereby less accurate against reality; it is merely less predictable. The
@@ -1739,7 +1809,7 @@ first decision rather than a column, because the cross-scale Pareto surface
 (Table~\ref{tab:pareto}) shows every 3B and 15B configuration to be dominated by
 a 650M one for this workload. Two rows were wrong in earlier drafts and are
 corrected here on measured evidence: 3B/\cfg{int4\_wo} for minimum memory (it
-uses more memory than 650M/\cfg{bf16}, is less accurate and is $20\times$
+uses more memory than 650M/\cfg{bf16}, is less accurate and is $19\times$
 slower), and asymmetric \cfg{int8\_dyn} for FP8-less bulk extraction (it is
 slower \emph{and} less faithful than \cfg{int8\_wo} there, Table~\ref{tab:bulk}).}
 \label{tab:recs}
@@ -1881,9 +1951,9 @@ three would have saved a further thirteen and left a third.
         convention; the configuration \emph{differences} are stable across all
         four.
   \item \textbf{Only two results survive multiple-comparison correction.}
-        Fifteen comparisons against fp32 are reported (five configurations at
-        three scales, plus two W8A8 remedies), against a Bonferroni threshold of
-        $0.0029$. Only
+        Seventeen comparisons against fp32 are reported --- five configurations
+        at three scales, plus the two W8A8 remedies --- against a Bonferroni
+        threshold of $0.05/17 = 0.0029$. Only
         \cfg{int8\_dyn} at 650M ($p = 0.0003$) and the 3B--650M interaction
         contrast for \cfg{int4\_wo} ($p = 0.0007$) clear it. The individual
         \cfg{int4\_wo} effects at 650M and 3B are nominal only
@@ -1914,9 +1984,10 @@ three would have saved a further thirteen and left a third.
         $\rho_{\text{fp32}} > 0.3$ is a judgement call. We report the
         sensitivity across cuts from $0.0$ to $0.4$; the 3B \cfg{int8\_dyn}
         result is invariant, the 650M \cfg{int4\_wo} result is not.
-  \item \textbf{Bootstrap resolution.} At 2000 resamples the smallest reportable
-        two-sided $p$ is $0.001$; values at that floor should be read as
-        $p < 0.002$ rather than as point estimates.
+  \item \textbf{Bootstrap resolution.} Benchmark-level tests use
+        $R = 20{,}000$, so the smallest reportable two-sided $p$ is $10^{-4}$;
+        single-assay tests use $R = 2000$ and floor at $0.001$. Values at either
+        floor should be read as upper bounds rather than as point estimates.
   \item \textbf{Low-signal assays resolve nothing individually.} Where
         $\rho_{\text{expt}} \approx 0.3$ the model's own error dominates and
         configuration differences fall below the noise floor; such assays
@@ -1958,7 +2029,7 @@ three would have saved a further thirteen and left a third.
         $6.2\times$ faster than fp32 over the full benchmark. Quantization is
         pure overhead here and compilation is actively harmful.
   \item \textbf{Variant-effect scoring at 15B: \cfg{fp8\_dyn}.} It matches bf16
-        speed ($0.97\times$) at half the peak memory ($14.6$ vs $28.6$\,GB) with
+        throughput ($1.01\times$) at half the peak memory ($14.6$ vs $28.6$\,GB) with
         no measurable accuracy cost. The recommendation inverts with scale.
   \item \textbf{\cfg{int8\_dyn} is repairable; \cfg{int4\_wo} is not, here.}
         \cfg{int8\_dyn}'s $-0.37$ collapse is a defect of its default
@@ -1966,8 +2037,8 @@ three would have saved a further thirteen and left a third.
         keyword, no calibration --- removes all six damaged assays and cuts the
         worst case to $-0.04$, and SmoothQuant does the same at higher cost.
         The accuracy repair transfers to bulk extraction (embedding cosine
-        $0.9906 \to 0.9993$); its \emph{speed} advantage does not, reversing
-        from $1.95\times$ symmetric on DMS to $0.85\times$ on bulk.
+        $0.9896 \to 0.9995$); its \emph{speed} advantage does not, reversing
+        from $1.95\times$ symmetric on DMS to $0.86\times$ on bulk.
         Neither configuration is fast enough to displace \cfg{bf16} for
         variant-effect scoring, but the blanket advice to avoid W8A8 on ESM-2
         would have been wrong.
@@ -2037,13 +2108,15 @@ The following are released with this work:
   \item Benchmark harness, scoring driver, and analysis code, including the
         extraction script that validates every variant's wild-type residue
         against \texttt{target\_seq} before writing.
-  \item \textbf{Per-variant predictions} for all 21 model/configuration
-        combinations: $2{,}413{,}913$ scores each, in the canonical assay row
-        order, so that any alternative statistic can be recomputed without
-        access to a GPU.
-  \item Per-assay statistics ($1206$ rows per model scale: accuracy,
-        wall-clock, peak memory, and fidelity for every assay/configuration
-        pair) and the aggregated summaries reported in Section~4.
+  \item \textbf{Per-variant predictions} for all 20 model/configuration
+        combinations --- six configurations at each of three scales, plus the
+        two W8A8 repairs at 3B --- at $2{,}413{,}913$ scores each, in the
+        canonical assay row order, so that any alternative statistic can be
+        recomputed without access to a GPU.
+  \item Per-assay statistics: $4020$ rows in total ($1206$ at 650M and 15B,
+        $1608$ at 3B), giving accuracy, wall-clock, peak memory and fidelity for
+        every assay/configuration pair, together with the aggregated summaries
+        reported in Section~4.
 \end{itemize}
 
 \noindent
@@ -2335,8 +2408,8 @@ Result artifacts referenced in this report:
         \texttt{results/proteingym/<model>\_<config>.jsonl.gz}
   \item Full-benchmark analysis:
         \texttt{results/proteingym/summary\_<model>.json} and\\
-        \texttt{summary\_<model>\_per\_assay.csv} (1206 rows: one per
-        assay/configuration)
+        \texttt{summary\_<model>\_per\_assay.csv} (one row per
+        assay/configuration: 1206 at 650M and 15B, 1608 at 3B)
 \end{itemize}
 \end{footnotesize}
 

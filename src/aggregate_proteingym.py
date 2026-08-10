@@ -234,19 +234,36 @@ def main() -> None:
     print("verdict uses the protein bootstrap -- the conservative of the two.")
 
     # ---- speed and RAM ----
+    # Two defensible speed conventions, and they are not interchangeable.
+    #   pos_per_s_agg = total positions / total seconds. Position-weighted, so
+    #     it equals total_h and is the throughput a user actually gets.
+    #   pos_per_s_med = median of the per-assay rates. Assay-weighted, so a
+    #     40-position assay counts as much as a 900-position one.
+    # For a configuration whose overhead is fixed per call rather than per
+    # position -- fp8_dyn is the case here -- the two disagree by up to 1.7x,
+    # because it is disproportionately slow on the short assays that the median
+    # weights heavily. Both are emitted so no ratio is reported without saying
+    # which one it is; the paper leads with _agg for consistency with total_h.
     agg = tab.groupby("config").agg(
-        total_sec=("seconds", "sum"), pos_per_s=("positions_per_s", "median"),
+        total_sec=("seconds", "sum"), total_pos=("n_positions", "sum"),
+        pos_per_s_med=("positions_per_s", "median"),
         var_per_s=("variants_per_s", "median"), peak_med=("peak_mem_gb", "median"),
         peak_max=("peak_mem_gb", "max"), rho_fp32_med=("rho_fp32", "median"),
         rho_fp32_min=("rho_fp32", "min"))
+    agg["pos_per_s_agg"] = agg.total_pos / agg.total_sec
+    ref_agg, ref_med = (agg.loc["bf16", "pos_per_s_agg"],
+                        agg.loc["bf16", "pos_per_s_med"]) if "bf16" in agg.index \
+        else (float("nan"), float("nan"))
     print("\nSPEED / RAM over the full benchmark")
-    print(f"{'config':10s} {'total_h':>8s} {'pos/s':>8s} {'var/s':>9s} "
-          f"{'peakGB_med':>11s} {'peakGB_max':>11s} {'rho_fp32_med':>13s} {'min':>8s}")
-    print("-" * 96)
+    print(f"{'config':10s} {'total_h':>8s} {'pos/s_agg':>10s} {'vs bf16':>8s} "
+          f"{'pos/s_med':>10s} {'vs bf16':>8s} {'peakGB_med':>11s} "
+          f"{'peakGB_max':>11s} {'rho_fp32_med':>13s} {'min':>8s}")
+    print("-" * 116)
     for cfg, r in agg.iterrows():
-        print(f"{cfg:10s} {r.total_sec / 3600:8.3f} {r.pos_per_s:8.1f} "
-              f"{r.var_per_s:9.1f} {r.peak_med:11.2f} {r.peak_max:11.2f} "
-              f"{r.rho_fp32_med:13.5f} {r.rho_fp32_min:8.4f}")
+        print(f"{cfg:10s} {r.total_sec / 3600:8.3f} {r.pos_per_s_agg:10.1f} "
+              f"{r.pos_per_s_agg / ref_agg:7.2f}x {r.pos_per_s_med:10.1f} "
+              f"{r.pos_per_s_med / ref_med:7.2f}x {r.peak_med:11.2f} "
+              f"{r.peak_max:11.2f} {r.rho_fp32_med:13.5f} {r.rho_fp32_min:8.4f}")
 
     # ---- by category ----
     piv = tab.pivot_table(index="category", columns="config", values="rho_expt")

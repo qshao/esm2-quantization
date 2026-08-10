@@ -109,22 +109,52 @@ def main():
             rows.append({"scale": m, "config": c,
                          "rho": wide[m][c].mean(),
                          "gb": speed[m][c]["peak_med"],
-                         "pos_s": speed[m][c]["pos_per_s"]})
+                         "pos_s": speed[m][c]["pos_per_s_agg"],
+                         "pos_s_med": speed[m][c]["pos_per_s_med"]})
     P = pd.DataFrame(rows)
-    # Dominated: some other option is >= on all three axes and > on at least one.
-    dom = []
-    for i, a in P.iterrows():
-        by = P[(P.rho >= a.rho) & (P.gb <= a.gb) & (P.pos_s >= a.pos_s)
-               & ~((P.rho == a.rho) & (P.gb == a.gb) & (P.pos_s == a.pos_s))]
-        dom.append(None if by.empty else f"{by.iloc[0].scale}/{by.iloc[0].config}")
-    P["dominated_by"] = dom
-    print(f"{'option':18s} {'mean rho':>9s} {'peak GB':>8s} {'pos/s':>8s}   dominated by")
+
+    def frontier(df, speed_col):
+        """Non-dominated set, and for each dominated row a dominator that is
+        itself on the frontier. Naming an arbitrary dominator is misleading --
+        650M/fp32 dominates several options while being dominated itself, so
+        citing it reads as an endorsement of a point we do not recommend."""
+        def dominators(a):
+            return df[(df.rho >= a.rho) & (df.gb <= a.gb) & (df[speed_col] >= a[speed_col])
+                      & ~((df.rho == a.rho) & (df.gb == a.gb)
+                          & (df[speed_col] == a[speed_col]))]
+        free = {i: dominators(a).empty for i, a in df.iterrows()}
+        out = []
+        for i, a in df.iterrows():
+            if free[i]:
+                out.append(None)
+                continue
+            d = dominators(a)
+            onf = d[[free[j] for j in d.index]]         # prefer a frontier member
+            d = (onf if not onf.empty else d).sort_values("rho", ascending=False)
+            out.append(f"{d.iloc[0].scale}/{d.iloc[0].config}")
+        return out
+
+    P["dominated_by"] = frontier(P, "pos_s")
+    P["dominated_by_median_convention"] = frontier(P, "pos_s_med")
+    print(f"{'option':18s} {'mean rho':>9s} {'peak GB':>8s} {'pos/s':>8s} "
+          f"{'pos/s med':>10s}   dominated by")
     print("-" * 92)
     for _, r in P.sort_values("rho", ascending=False).iterrows():
         tag = r.dominated_by or "-- on the frontier --"
         print(f"{r.scale + '/' + r.config:18s} {r.rho:9.4f} {r.gb:8.2f} "
-              f"{r.pos_s:8.1f}   {tag}")
+              f"{r.pos_s:8.1f} {r.pos_s_med:10.1f}   {tag}")
+    # The frontier must not depend on which speed convention we chose, or the
+    # paper's most consequential claim would be an artifact of that choice.
+    fa = set(P.loc[P.dominated_by.isna(), ["scale", "config"]].itertuples(index=False))
+    fm = set(P.loc[P.dominated_by_median_convention.isna(),
+                   ["scale", "config"]].itertuples(index=False))
+    print(f"\n   frontier under aggregate throughput : "
+          f"{sorted(f'{s}/{c}' for s, c in fa)}")
+    print(f"   frontier under median-of-assay rates: "
+          f"{sorted(f'{s}/{c}' for s, c in fm)}")
+    print(f"   identical: {fa == fm}")
     out["pareto"] = json.loads(P.to_json(orient="records"))
+    out["pareto_frontier_convention_invariant"] = bool(fa == fm)
 
     # ---------- 2. per-scale tests and the interaction ----------
     print("\n" + "=" * 92)
